@@ -1,0 +1,6 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+ultimo_relatorio.html
+.pytest_cache/
