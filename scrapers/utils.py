@@ -89,12 +89,14 @@ def classify_ssd_capacity(title: str) -> Optional[str]:
     """Classifica SSD em '512GB' ou '1TB', ignorando cases, gavetas e adaptadores."""
     t = title.upper()
     
-    # Exclui acessórios (cases, cabos, gavetas, adaptadores, capas)
+    # Exclui acessórios (cases, cabos, gavetas, adaptadores, capas) e discos rígidos mecânicos (HDs)
     if re.search(r'\b(CASE|GAVETA|ADAPTADOR|DOCK|CABO|DISSIPADOR|ENCLOSURE|CAPA|BOLSA|ESTOJO)\b', t):
+        return None
+    if re.search(r'\b(RPM|DISCO R[ÍI]GIDO|HD INTERNO|HDD)\b', t) and not re.search(r'\bSSD\b', t):
         return None
     
     # Confirma que é SSD
-    if not re.search(r'\b(SSD|NVME|M\.2|SATA|PCIE)\b', t):
+    if not re.search(r'\b(SSD|NVME|M\.2)\b', t):
         return None
     
     # 1TB (inclui 960GB, 1000GB, 1TB, 1024GB, 960G, 1000G)
