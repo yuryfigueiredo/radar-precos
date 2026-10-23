@@ -21,7 +21,7 @@ Automação 100% em nuvem que monitora os menores preços de computadores gamer 
 ---
 
 ## 📁 Pasta Oficial do Projeto:
-`C:\Users\Yury\Documents\Projetos Yury\Automações\Automações de busca de preço`
+`\Documents\Projetos Yury\Automações\Automações de busca de preço`
 
 ---
 
