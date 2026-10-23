@@ -24,7 +24,8 @@ from scrapers import (
     MercadoLivreScraper,
     format_currency,
     extract_gpu_name,
-    get_ai_recommendation
+    get_ai_recommendation,
+    analyze_pc_ram_upgrade
 )
 from notifier import send_email_alert
 
@@ -34,6 +35,48 @@ logging.basicConfig(
     datefmt='%H:%M:%S'
 )
 logger = logging.getLogger("RadarHardware")
+
+def enrich_ai_pc_details(item: Dict[str, Any]) -> Dict[str, Any]:
+    """Enriquece informações de placa-mãe e slots buscando detalhes da página do produto."""
+    import re
+    url = item.get('link', '')
+    title = item.get('title', '')
+    price = float(item.get('price', 0))
+    desc_detail = ""
+    
+    if url and item.get('store') == 'Pichau':
+        try:
+            from curl_cffi import requests as cffi_requests
+            from bs4 import BeautifulSoup
+            session = cffi_requests.Session(impersonate="chrome124")
+            headers = {"Accept-Language": "pt-BR,pt;q=0.9"}
+            r = session.get(url, headers=headers, timeout=10)
+            if r.status_code == 200:
+                html = r.text
+                soup = BeautifulSoup(html, "html.parser")
+                m_h3 = re.search(r'<h3[^>]*>\s*PLACA\s*M[ÃA]E\s*([^<]+)</h3>', html, re.IGNORECASE)
+                mobo = ""
+                if m_h3:
+                    mobo = m_h3.group(1).strip()
+                else:
+                    m_chip = re.search(r'\b(H510M?|A520M?|H610M?|B450M?|B550M?|B760M?|B650M?|A320M?|H310M?|B360M?|Z690|Z790)\b', html, re.IGNORECASE)
+                    if m_chip:
+                        mobo = m_chip.group(1).upper()
+                imgs = [img.get('src', '') for img in soup.find_all('img')]
+                has_2x = any('2x' in img.lower() and 'memoria' in img.lower() for img in imgs)
+                has_1x = any(('1x' in img.lower() or '-1x' in img.lower()) and 'memoria' in img.lower() for img in imgs)
+                if mobo:
+                    desc_detail += f"PLACA MÃE {mobo} "
+                if has_1x:
+                    desc_detail += "1x16GB "
+                elif has_2x:
+                    desc_detail += "2x8GB "
+        except Exception:
+            pass
+
+    ram_info = analyze_pc_ram_upgrade(title, desc_detail, price)
+    item['ram_info'] = ram_info
+    return item
 
 async def run_radar():
     logger.info("=" * 60)
@@ -137,6 +180,14 @@ async def run_radar():
         })
     ai_ranking = sorted(ai_pcs, key=lambda x: (x['cost_per_gb'], x['price']))
 
+    # Enriquecimento assíncrono dos melhores PCs de IA com análise de upgrade de RAM para 32GB
+    if ai_ranking:
+        logger.info("Analisando especificações de placa-mãe e upgrade para 32GB nos melhores PCs de IA...")
+        ai_top = ai_ranking[:8]
+        tasks = [asyncio.to_thread(enrich_ai_pc_details, p) for p in ai_top]
+        enriched_top = await asyncio.gather(*tasks)
+        ai_ranking = enriched_top + ai_ranking[8:]
+
     ssds_512 = sorted([s for s in all_ssds if s.get('capacity') == '512GB'], key=lambda x: x['price'])
     ssds_1tb = sorted([s for s in all_ssds if s.get('capacity') == '1TB'], key=lambda x: x['price'])
 
@@ -149,8 +200,12 @@ async def run_radar():
     
     print("\n[RANKING CUSTO-BENEFICIO: SERVIDORES DE IA (NVIDIA 12GB / 16GB)]:")
     for rank, p in enumerate(ai_ranking[:6], 1):
+        ram_info = p.get('ram_info') or {}
+        est_tot = ram_info.get('est_total_32gb', p['price'])
         print(f"  #{rank} [R$ {p['cost_per_gb']:.2f}/GB] {format_currency(p['price'])} - [{p['store']}] {p['gpu_name']} ({p['title'][:45]}...)")
-        print(f"     -> {p['ai_recommendation']}")
+        print(f"     -> Placa: {ram_info.get('mobo', 'M-ATX')} ({ram_info.get('slots', 2)} slots) | RAM Padrão: {ram_info.get('ram_desc', '16GB')}")
+        print(f"     -> Upgrade 32GB: {ram_info.get('status_label', 'N/D')} [Total Estimado: {format_currency(est_tot)}]")
+        print(f"     -> Recomendação IA: {p['ai_recommendation']}")
 
     print("\n[PCs COM 12GB VRAM - EXCLUSIVO NVIDIA]:")
     for p in pcs_12gb[:8]:

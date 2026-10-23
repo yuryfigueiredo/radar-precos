@@ -1,5 +1,5 @@
 import re
-from typing import Optional, Any
+from typing import Optional, Any, Dict
 
 def clean_price(price_input: Any) -> Optional[float]:
     """Converte diferentes formatos de preço (float, int ou string 'R$ 1.234,56') para float."""
@@ -184,3 +184,93 @@ def is_valid_ram_16gb_ddr4(title: str) -> bool:
         return False
 
     return True
+
+def analyze_pc_ram_upgrade(title: str, text: str = "", price: float = 0.0) -> Dict[str, Any]:
+    """
+    Analisa a placa-mãe e configuração de RAM para determinar a viabilidade e facilidade de upgrade para 32GB (Servidor IA).
+    """
+    full_text = f"{title} {text}".upper()
+    
+    # 1. Identificar Placa-Mãe
+    m_h3 = re.search(r'PLACA\s*M[ÃA]E\s*([^<\n\r]+)', text, re.IGNORECASE)
+    mobo = "M-ATX"
+    if m_h3:
+        raw_mobo = m_h3.group(1).strip()
+        m_chip = re.search(r'\b(H510M?|A520M?|H610M?|B450M?|B550M?|B760M?|B650M?|A320M?|H310M?|B360M?|Z690|Z790|X570)\b', raw_mobo, re.IGNORECASE)
+        if m_chip:
+            mobo = m_chip.group(1).upper()
+        else:
+            mobo = raw_mobo[:20].strip()
+    else:
+        m_chip = re.search(r'\b(H510M?|A520M?|H610M?|B450M?|B550M?|B760M?|B650M?|A320M?|H310M?|B360M?|Z690|Z790|X570)\b', full_text, re.IGNORECASE)
+        if m_chip:
+            mobo = m_chip.group(1).upper()
+
+    # 2. Slots estimados
+    if any(k in mobo for k in ["B550", "B760", "B650", "Z690", "Z790", "X570"]) or "4 SLOTS" in full_text:
+        slots = 4
+    else:
+        slots = 2
+
+    # 3. Configuração de RAM instalada
+    has_2x = bool(re.search(r'\b2\s*[xX]\s*8\s*GB\b|MEMORIA-GEN-2X|2X8GB', full_text))
+    has_1x = bool(re.search(r'\b1\s*[xX]\s*16\s*GB\b|MEMORIA-PCH-GEN-1X|1X16GB', full_text))
+    
+    if re.search(r'\b32\s*GB\b', full_text) and not re.search(r'UPGRADE|SUPORTA', full_text):
+        ram_desc = "32GB"
+    elif has_1x or ("16GB" in full_text and "1X" in full_text):
+        ram_desc = "1x16GB"
+    elif has_2x or "2X8GB" in full_text:
+        ram_desc = "2x8GB"
+    elif "16GB" in full_text:
+        ram_desc = "2x8GB"
+    elif "8GB" in full_text:
+        ram_desc = "1x8GB"
+    else:
+        ram_desc = "16GB"
+
+    # 4. Status de upgrade para 32GB
+    if "32GB" in ram_desc:
+        status_label = "32GB Nativo"
+        badge_type = "success"
+        badge_bg = "#dcfce7"
+        badge_color = "#15803d"
+        extra_cost = 0.0
+        tip = "Já vem com 32GB de fábrica. Capacidade ideal para LLMs locais sem custo adicional."
+    elif ram_desc == "1x16GB":
+        status_label = "Upgrade Fácil (+1x 16GB)"
+        badge_type = "easy"
+        badge_bg = "#dbeafe"
+        badge_color = "#1d4ed8"
+        extra_cost = 320.0
+        tip = "Possui 1 slot livre. Basta adicionar +1 pente de 16GB avulso (~R$ 320) do radar para ter 32GB Dual Channel."
+    elif slots == 4:
+        status_label = "Upgrade Fácil (Placa 4 Slots)"
+        badge_type = "easy"
+        badge_bg = "#dbeafe"
+        badge_color = "#1d4ed8"
+        extra_cost = 320.0
+        tip = f"Placa-mãe {mobo} tem 4 slots. Você pode adicionar pentes extras sem retirar a memória original."
+    else:
+        status_label = "2 Slots Ocupados (Troca p/ 2x16GB)"
+        badge_type = "replace"
+        badge_bg = "#fef3c7"
+        badge_color = "#b45309"
+        extra_cost = 600.0
+        tip = f"Placa {mobo} com 2 slots ocupados por 2x8GB. Para 32GB, compre um kit 2x16GB avulso (~R$ 600) em vez de pagar R$ 777 na Pichau."
+
+    est_total_32gb = price + extra_cost if price > 0 else 0.0
+
+    return {
+        "mobo": mobo,
+        "slots": slots,
+        "ram_desc": ram_desc,
+        "status_label": status_label,
+        "badge_type": badge_type,
+        "badge_bg": badge_bg,
+        "badge_color": badge_color,
+        "extra_cost": extra_cost,
+        "est_total_32gb": est_total_32gb,
+        "tip": tip
+    }
+

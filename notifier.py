@@ -95,6 +95,18 @@ def generate_html_report(data: Dict[str, Any]) -> str:
             ai_rec = item.get('ai_recommendation', 'Compatível com modelos LLM locais (Ollama / vLLM)')
             warranty = item.get('warranty', 'Garantia Oficial')
 
+            # Dados de Upgrade de RAM para 32GB
+            ram_info = item.get('ram_info') or {}
+            mobo = ram_info.get('mobo', 'M-ATX')
+            slots = ram_info.get('slots', 2)
+            ram_desc = ram_info.get('ram_desc', '16GB')
+            status_label = ram_info.get('status_label', 'Slots Ocupados (2x8GB)')
+            badge_bg = ram_info.get('badge_bg', '#fef3c7')
+            badge_color = ram_info.get('badge_color', '#b45309')
+            extra_cost = ram_info.get('extra_cost', 600.0)
+            est_total_32gb = ram_info.get('est_total_32gb', item.get('price', 0) + extra_cost)
+            est_total_str = f"R$ {est_total_32gb:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
             rows_html += f'''
             <tr style="background-color: {row_bg}; border-bottom: 1px solid #e2e8f0;">
                 <td style="padding: 12px 10px; font-size: 12px; white-space: nowrap; vertical-align: middle;">
@@ -121,7 +133,18 @@ def generate_html_report(data: Dict[str, Any]) -> str:
                 <td style="padding: 12px 10px; font-size: 14px; font-weight: 800; color: #0e2a47; text-align: right; white-space: nowrap; vertical-align: middle;">
                     {clean_price_val}
                 </td>
-                <td style="padding: 12px 12px; font-size: 11px; color: #334155; line-height: 1.4; vertical-align: middle; max-width: 200px;">
+                <td style="padding: 12px 10px; font-size: 11px; vertical-align: middle; white-space: nowrap;">
+                    <span style="background-color: {badge_bg}; color: {badge_color}; font-weight: 800; font-size: 11px; padding: 3px 7px; border-radius: 4px; display: inline-block; margin-bottom: 3px;">
+                        {status_label}
+                    </span>
+                    <div style="font-size: 11px; color: #475569; margin-top: 2px;">
+                        Placa: <b>{mobo}</b> ({slots} slots) • Padrão: <b>{ram_desc}</b>
+                    </div>
+                    <div style="font-size: 11px; color: #047857; font-weight: 700; margin-top: 3px;">
+                        Total c/ 32GB: ~{est_total_str}
+                    </div>
+                </td>
+                <td style="padding: 12px 12px; font-size: 11px; color: #334155; line-height: 1.4; vertical-align: middle; max-width: 190px;">
                     {ai_rec}
                 </td>
                 <td style="padding: 12px 10px; text-align: center; white-space: nowrap; vertical-align: middle;">
@@ -142,11 +165,11 @@ def generate_html_report(data: Dict[str, Any]) -> str:
                     🧠 RANKING CUSTO-BENEFÍCIO — SERVIDORES DE IA (NVIDIA CUDA)
                 </h2>
                 <p style="margin: 4px 0 0 0; font-size: 12px; color: #cbd5e1; line-height: 1.4;">
-                    Filtro estrito de arquitetura NVIDIA CUDA (12GB e 16GB VRAM) para execução de LLMs locais (Ollama, vLLM, PyTorch), geração de imagens e fine-tuning.
+                    Filtro estrito de arquitetura NVIDIA CUDA (12GB e 16GB VRAM) para execução de LLMs locais (Ollama, vLLM, PyTorch) com análise de viabilidade de upgrade para 32GB de memória RAM.
                 </p>
             </div>
             <div style="overflow-x: auto; background-color: #ffffff;">
-                <table style="width: 100%; border-collapse: collapse; text-align: left; min-width: 760px;">
+                <table style="width: 100%; border-collapse: collapse; text-align: left; min-width: 820px;">
                     <thead>
                         <tr style="background-color: #f1f5f9; color: #334155; border-bottom: 2px solid #cbd5e1;">
                             <th style="padding: 10px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase;">RANK / LOJA</th>
@@ -154,6 +177,7 @@ def generate_html_report(data: Dict[str, Any]) -> str:
                             <th style="padding: 10px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase;">GPU & VRAM</th>
                             <th style="padding: 10px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; text-align: center;">CUSTO / GB VRAM</th>
                             <th style="padding: 10px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; text-align: right;">PREÇO ATUAL</th>
+                            <th style="padding: 10px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase;">UPGRADE 32GB (IA)</th>
                             <th style="padding: 10px 12px; font-size: 11px; font-weight: 700; text-transform: uppercase;">VIABILIDADE P/ IA</th>
                             <th style="padding: 10px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; text-align: center;">AÇÃO</th>
                         </tr>
@@ -162,6 +186,12 @@ def generate_html_report(data: Dict[str, Any]) -> str:
                         {rows_html}
                     </tbody>
                 </table>
+            </div>
+            <div style="background-color: #eff6ff; border-top: 1px solid #bfdbfe; padding: 12px 18px; font-size: 12px; color: #1e40af; line-height: 1.5;">
+                💡 <b>Dica de Custo-Benefício para 32GB de RAM:</b>
+                No configurador da loja (botão <i>"Alterar"</i>), cobram até <b>+R$ 777,40</b> para colocar 32GB. 
+                <b>Não faça pelo configurador!</b> É muito mais econômico comprar a máquina original e adquirir a memória avulsa na seção de <i>RAMs 16GB DDR4</i> abaixo:
+                se o PC tiver 1 slot vago, você só gasta <b>~R$ 320</b> (economia de mais de R$ 450!). Se os 2 slots estiverem cheios (2x8GB), compre um kit 2x16GB por ~R$ 600 e venda as memórias originais.
             </div>
         </div>
         '''
