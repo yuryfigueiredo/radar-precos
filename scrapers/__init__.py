@@ -3,7 +3,7 @@ from .terabyte import TerabyteScraper
 from .pichau import PichauScraper
 from .amazon import AmazonScraper
 from .mercadolivre import MercadoLivreScraper
-from .utils import format_currency
+from .utils import format_currency, extract_gpu_name, get_ai_recommendation
 
 __all__ = [
     'KabumScraper',
@@ -11,5 +11,7 @@ __all__ = [
     'PichauScraper',
     'AmazonScraper',
     'MercadoLivreScraper',
-    'format_currency'
+    'format_currency',
+    'extract_gpu_name',
+    'get_ai_recommendation'
 ]

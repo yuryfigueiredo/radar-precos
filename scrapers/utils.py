@@ -32,11 +32,46 @@ def format_currency(value: float) -> str:
     """Formata valor em Real Brasileiro (BRL)"""
     return f"R$ {value:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
+def is_nvidia_gpu(text: str) -> bool:
+    """Verifica se a GPU do computador é da NVIDIA (GeForce, RTX, GTX, Quadro)."""
+    t = text.upper()
+    return bool(re.search(r'\b(GEFORCE|RTX|GTX|NVIDIA|QUADRO)\b', t))
+
+def extract_gpu_name(title: str, description: str = "") -> str:
+    """Extrai de forma limpa o modelo exato da GPU para exibição técnica."""
+    t = f"{title} {description}".upper()
+    m_nv = re.search(r'\b((?:GEFORCE\s+)?RTX\s+\d{4}(?:\s*TI|\s*SUPER)*(?:\s*\d{1,2}\s*GB)?)\b', t)
+    if m_nv:
+        return m_nv.group(1).title()
+    m_gtx = re.search(r'\b((?:GEFORCE\s+)?GTX\s+\d{4}(?:\s*TI)*(?:\s*\d{1,2}\s*GB)?)\b', t)
+    if m_gtx:
+        return m_gtx.group(1).title()
+    m_amd = re.search(r'\b((?:RADEON\s+)?RX\s+\d{3,4}(?:\s*XT|\s*GRE)*(?:\s*\d{1,2}\s*GB)?)\b', t)
+    if m_amd:
+        return m_amd.group(1).title()
+    return "GPU Dedicada"
+
+def get_ai_recommendation(gpu_name: str, vram: int) -> str:
+    """Gera recomendação técnica de uso para servidores de Inteligência Artificial e LLMs."""
+    g = gpu_name.upper()
+    if vram >= 16:
+        if "4060" in g:
+            return "Melhor custo 16GB VRAM: Excelente p/ Modelos 14B Q4 (Qwen 2.5), Fine-Tuning LoRA e contexto longo"
+        elif any(k in g for k in ["4070", "4080", "5070", "5080"]):
+            return "Alta performance Ada/Blackwell: FP8 nativo, altíssima velocidade p/ vLLM e batch inference"
+        return "16GB VRAM: Ideal p/ Fine-Tuning LoRA e Modelos 14B quantizados"
+    else: # 12GB
+        if "3060" in g:
+            return "Campeão Custo/Benefício: Roda LLaMA-3 8B, Mistral 7B e SDXL c/ folga de contexto (Q4/Q8)"
+        elif any(k in g for k in ["4070", "5070"]):
+            return "Tensor Cores 4ª/5ª Geração: FP8 nativo, inferência ultra-rápida de LLMs locais"
+        return "12GB VRAM: Perfeito p/ Ollama, Whisper Large v3, Embeddings e LLMs 7B/8B"
+
 def classify_pc_vram(title: str, description: str = "") -> Optional[str]:
     """
     Classifica a VRAM da GPU do PC em '8GB', '12GB' ou '16GB'.
-    Mapeia rigorosamente pelos modelos de placa de vídeo do mercado,
-    NUNCA confundindo memória RAM com VRAM da GPU.
+    - Categorias 12GB e 16GB: EXCLUSIVAMENTE NVIDIA (Foco em Servidores de IA / CUDA).
+    - Categoria 8GB: NVIDIA e AMD (Faixa econômica de entrada).
     """
     t = f"{title} {description}".upper()
     
@@ -56,27 +91,29 @@ def classify_pc_vram(title: str, description: str = "") -> Optional[str]:
         if not re.search(r'\b(RTX\s*(?:3060|3070|3080|40|50)|RX\s*(?:6600|7600|7650|7700|7800|90))\b', t):
             return None
 
-    # 1. GPUs de 16GB VRAM
-    if re.search(r'\b(RTX\s*5080|RTX\s*5070\s*TI|RTX\s*4090|RTX\s*4080|RTX\s*4070\s*TI\s*SUPER|RX\s*9070|RX\s*7900|RX\s*7800\s*XT|RX\s*7600\s*XT|RX\s*6950|RX\s*6900|RX\s*6800|ARC\s*A770\s*16\s*GB|RX\s*9060\s*XT\s*16\s*GB)\b', t):
-        return '16GB'
-    if re.search(r'\b(RTX\s*4060\s*TI|RTX\s*5060\s*TI)\b', t) and re.search(r'\b16\s*GB\b(?!.*(?:DDR|RAM))', t):
-        return '16GB'
-    if re.search(r'\b16\s*GB\s*(?:VRAM|DEDICADA)\b', t):
-        return '16GB'
-    if re.search(r'(?:RTX|RX|RADEON|GEFORCE|ARC)\s+[A-Z0-9\s]+?\b16\s*GB\b(?!.*(?:DDR|RAM))', t):
-        return '16GB'
+    # 1. GPUs de 16GB VRAM (EXCLUSIVAMENTE NVIDIA - Servidor de IA / CUDA)
+    if is_nvidia_gpu(t):
+        if re.search(r'\b(RTX\s*5080|RTX\s*5070\s*TI|RTX\s*4090|RTX\s*4080|RTX\s*4070\s*TI\s*SUPER|RTX\s*3090)\b', t):
+            return '16GB'
+        if re.search(r'\b(RTX\s*4060\s*TI|RTX\s*5060\s*TI)\b', t) and re.search(r'\b16\s*GB\b(?!.*(?:DDR|RAM))', t):
+            return '16GB'
+        if re.search(r'\b16\s*GB\s*(?:VRAM|DEDICADA)\b', t):
+            return '16GB'
+        if re.search(r'(?:RTX|GEFORCE|QUADRO)\s+[A-Z0-9\s]+?\b16\s*GB\b(?!.*(?:DDR|RAM))', t):
+            return '16GB'
 
-    # 2. GPUs de 12GB VRAM
-    if re.search(r'\b(RTX\s*5070(?!\s*TI)|RTX\s*4070\s*TI(?!\s*SUPER)|RTX\s*4070\s*SUPER|RTX\s*4070(?!\s*TI)|RX\s*7700\s*XT|RX\s*6750\s*XT|RX\s*6700\s*XT|RTX\s*3080\s*TI|RTX\s*3080\s*12\s*GB|ARC\s*B580)\b', t):
-        return '12GB'
-    if re.search(r'\bRTX\s*3060\b', t) and not re.search(r'\bRTX\s*3060\s*8\s*GB\b', t):
-        return '12GB'
-    if re.search(r'\b12\s*GB\s*(?:VRAM|DEDICADA)\b', t):
-        return '12GB'
-    if re.search(r'(?:RTX|RX|RADEON|GEFORCE|ARC)\s+[A-Z0-9\s]+?\b12\s*GB\b(?!.*(?:DDR|RAM))', t):
-        return '12GB'
+    # 2. GPUs de 12GB VRAM (EXCLUSIVAMENTE NVIDIA - Servidor de IA / CUDA)
+    if is_nvidia_gpu(t):
+        if re.search(r'\b(RTX\s*5070(?!\s*TI)|RTX\s*4070\s*TI(?!\s*SUPER)|RTX\s*4070\s*SUPER|RTX\s*4070(?!\s*TI)|RTX\s*3080\s*TI|RTX\s*3080\s*12\s*GB)\b', t):
+            return '12GB'
+        if re.search(r'\bRTX\s*3060\b', t) and not re.search(r'\bRTX\s*3060\s*8\s*GB\b', t):
+            return '12GB'
+        if re.search(r'\b12\s*GB\s*(?:VRAM|DEDICADA)\b', t):
+            return '12GB'
+        if re.search(r'(?:RTX|GEFORCE)\s+[A-Z0-9\s]+?\b12\s*GB\b(?!.*(?:DDR|RAM))', t):
+            return '12GB'
 
-    # 3. GPUs de 8GB VRAM
+    # 3. GPUs de 8GB VRAM (NVIDIA e AMD - Categoria de Entrada Econômica)
     if re.search(r'\b(RTX\s*5060(?!\s*TI\s*16)|RTX\s*5050|RTX\s*4060(?!\s*TI\s*16)|RTX\s*3070|RTX\s*3060\s*8\s*GB|RTX\s*3050|RTX\s*2070|RTX\s*2060\s*SUPER|RX\s*9050|RX\s*7650|RX\s*7600(?!\s*XT)|RX\s*6650|RX\s*6600|RX\s*580|RX\s*590|RX\s*570|ARC\s*A580|ARC\s*A750)\b', t):
         if re.search(r'\bRTX\s*3050\s*6\s*GB\b', t) or (re.search(r'\bRTX\s*3050\b', t) and re.search(r'\b6\s*GB\b', t)):
             return None

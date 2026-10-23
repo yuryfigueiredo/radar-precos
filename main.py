@@ -22,7 +22,9 @@ from scrapers import (
     PichauScraper,
     AmazonScraper,
     MercadoLivreScraper,
-    format_currency
+    format_currency,
+    extract_gpu_name,
+    get_ai_recommendation
 )
 from notifier import send_email_alert
 
@@ -113,6 +115,28 @@ async def run_radar():
     pcs_12gb = sorted([p for p in all_pcs if p.get('vram') == '12GB'], key=lambda x: x['price'])
     pcs_16gb = sorted([p for p in all_pcs if p.get('vram') == '16GB'], key=lambda x: x['price'])
 
+    # Ranking de Custo-Benefício para Servidores de IA (Exclusivo NVIDIA 12GB e 16GB)
+    ai_pcs = []
+    seen_ai_links = set()
+    for p in (pcs_12gb + pcs_16gb):
+        link = p.get('link', '')
+        if link in seen_ai_links:
+            continue
+        seen_ai_links.add(link)
+        vram_num = 16 if p.get('vram') == '16GB' else 12
+        price = float(p.get('price', 0))
+        cost_per_gb = round(price / vram_num, 2)
+        gpu_name = extract_gpu_name(p['title'])
+        ai_recommendation = get_ai_recommendation(gpu_name, vram_num)
+        ai_pcs.append({
+            **p,
+            'vram_num': vram_num,
+            'cost_per_gb': cost_per_gb,
+            'gpu_name': gpu_name,
+            'ai_recommendation': ai_recommendation
+        })
+    ai_ranking = sorted(ai_pcs, key=lambda x: (x['cost_per_gb'], x['price']))
+
     ssds_512 = sorted([s for s in all_ssds if s.get('capacity') == '512GB'], key=lambda x: x['price'])
     ssds_1tb = sorted([s for s in all_ssds if s.get('capacity') == '1TB'], key=lambda x: x['price'])
 
@@ -123,16 +147,21 @@ async def run_radar():
     print("RESULTADOS DOS MENORES PRECOS ENCONTRADOS")
     print("=" * 60)
     
-    print("\n[PCs COM 8GB VRAM]:")
-    for p in pcs_8gb[:8]:
-        print(f"  [{p['store']}] {format_currency(p['price'])} - {p['title'][:65]}")
-        
-    print("\n[PCs COM 12GB VRAM]:")
+    print("\n[RANKING CUSTO-BENEFICIO: SERVIDORES DE IA (NVIDIA 12GB / 16GB)]:")
+    for rank, p in enumerate(ai_ranking[:6], 1):
+        print(f"  #{rank} [R$ {p['cost_per_gb']:.2f}/GB] {format_currency(p['price'])} - [{p['store']}] {p['gpu_name']} ({p['title'][:45]}...)")
+        print(f"     -> {p['ai_recommendation']}")
+
+    print("\n[PCs COM 12GB VRAM - EXCLUSIVO NVIDIA]:")
     for p in pcs_12gb[:8]:
         print(f"  [{p['store']}] {format_currency(p['price'])} - {p['title'][:65]}")
 
-    print("\n[PCs COM 16GB VRAM]:")
+    print("\n[PCs COM 16GB VRAM - EXCLUSIVO NVIDIA]:")
     for p in pcs_16gb[:8]:
+        print(f"  [{p['store']}] {format_currency(p['price'])} - {p['title'][:65]}")
+
+    print("\n[PCs COM 8GB VRAM - NVIDIA E AMD]:")
+    for p in pcs_8gb[:8]:
         print(f"  [{p['store']}] {format_currency(p['price'])} - {p['title'][:65]}")
 
     print("\n[MEMORIAS RAM 16GB DDR4 GAMER]:")
@@ -151,6 +180,7 @@ async def run_radar():
 
     # Envio do e-mail e geração de relatório
     report_data = {
+        'ai_ranking': ai_ranking,
         'pcs_8gb': pcs_8gb,
         'pcs_12gb': pcs_12gb,
         'pcs_16gb': pcs_16gb,

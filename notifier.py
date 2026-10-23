@@ -68,6 +68,105 @@ def generate_html_report(data: Dict[str, Any]) -> str:
         'Mercado Livre': ('#ffe600', '#000000')
     }
 
+    def render_ai_ranking_table(items: List[Dict[str, Any]], max_items: int = 6) -> str:
+        if not items:
+            return '<p style="color: #64748b; font-style: italic; padding: 10px 0; font-size: 13px;">Nenhuma oferta NVIDIA compatível para IA encontrada no momento.</p>'
+        
+        rows_html = ""
+        for i, item in enumerate(items[:max_items]):
+            store = item.get('store', 'Loja')
+            bg_color, text_color = store_badges.get(store, ('#334155', '#ffffff'))
+            
+            if i == 0:
+                rank_badge = '<span style="background: #fef08a; color: #854d0e; font-weight: 800; font-size: 11px; padding: 3px 8px; border-radius: 4px; display: inline-block;">🥇 #1 TOP</span>'
+            elif i == 1:
+                rank_badge = '<span style="background: #e2e8f0; color: #334155; font-weight: 800; font-size: 11px; padding: 3px 8px; border-radius: 4px; display: inline-block;">🥈 #2</span>'
+            elif i == 2:
+                rank_badge = '<span style="background: #fed7aa; color: #9a3412; font-weight: 800; font-size: 11px; padding: 3px 8px; border-radius: 4px; display: inline-block;">🥉 #3</span>'
+            else:
+                rank_badge = f'<span style="background: #f1f5f9; color: #64748b; font-weight: 700; font-size: 11px; padding: 3px 7px; border-radius: 4px; display: inline-block;">#{i+1}</span>'
+                
+            row_bg = "#ffffff" if i % 2 == 0 else "#f8fafc"
+            clean_price_val = f"{item.get('price', 0):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            cost_gb = item.get('cost_per_gb', 0)
+            cost_gb_str = f"R$ {cost_gb:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            gpu_name = item.get('gpu_name', 'NVIDIA GPU')
+            vram = item.get('vram', '12GB')
+            ai_rec = item.get('ai_recommendation', 'Compatível com modelos LLM locais (Ollama / vLLM)')
+            warranty = item.get('warranty', 'Garantia Oficial')
+
+            rows_html += f'''
+            <tr style="background-color: {row_bg}; border-bottom: 1px solid #e2e8f0;">
+                <td style="padding: 12px 10px; font-size: 12px; white-space: nowrap; vertical-align: middle;">
+                    <div style="margin-bottom: 4px;">{rank_badge}</div>
+                    <span style="background-color: {bg_color}; color: {text_color}; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 3px; display: inline-block;">
+                        {store[:4].upper()}
+                    </span>
+                </td>
+                <td style="padding: 12px 12px; font-size: 13px; color: #1e293b; line-height: 1.4; vertical-align: middle;">
+                    <div style="font-weight: 700; color: #0f172a;">{item.get('title')}</div>
+                    <div style="font-size: 11px; color: #64748b; margin-top: 2px;">🛡️ {warranty}</div>
+                </td>
+                <td style="padding: 12px 10px; font-size: 12px; white-space: nowrap; vertical-align: middle;">
+                    <span style="background: #dbeafe; color: #1e40af; font-weight: 700; padding: 3px 8px; border-radius: 4px; font-size: 11px; display: inline-block;">
+                        {gpu_name}
+                    </span>
+                    <div style="font-size: 11px; color: #475569; font-weight: 600; margin-top: 3px;">{vram} VRAM</div>
+                </td>
+                <td style="padding: 12px 10px; text-align: center; white-space: nowrap; vertical-align: middle;">
+                    <span style="background-color: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; font-weight: 800; font-size: 12px; padding: 4px 8px; border-radius: 5px; display: inline-block;">
+                        {cost_gb_str} / GB
+                    </span>
+                </td>
+                <td style="padding: 12px 10px; font-size: 14px; font-weight: 800; color: #0e2a47; text-align: right; white-space: nowrap; vertical-align: middle;">
+                    {clean_price_val}
+                </td>
+                <td style="padding: 12px 12px; font-size: 11px; color: #334155; line-height: 1.4; vertical-align: middle; max-width: 200px;">
+                    {ai_rec}
+                </td>
+                <td style="padding: 12px 10px; text-align: center; white-space: nowrap; vertical-align: middle;">
+                    <a href="{item.get('link')}" target="_blank" style="background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); color: #ffffff; text-decoration: none; font-size: 11px; font-weight: 700; padding: 7px 12px; border-radius: 5px; display: inline-block; box-shadow: 0 2px 4px rgba(37,99,235,0.2);">
+                        Ver Oferta &rarr;
+                    </a>
+                </td>
+            </tr>
+            '''
+
+        card_html = f'''
+        <div style="margin-bottom: 30px; border: 2px solid #2563eb; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 14px rgba(37, 99, 235, 0.12);">
+            <div style="background: linear-gradient(135deg, #0e2a47 0%, #1e3a8a 100%); padding: 16px 20px; color: #ffffff;">
+                <span style="background-color: #38bdf8; color: #082f49; font-size: 10px; font-weight: 800; padding: 2px 8px; border-radius: 12px; text-transform: uppercase; letter-spacing: 0.5px; display: inline-block; margin-bottom: 5px;">
+                    CUDA ACCELERATED • IA & LLM SERVER
+                </span>
+                <h2 style="margin: 0; font-size: 17px; font-weight: 800; color: #ffffff;">
+                    🧠 RANKING CUSTO-BENEFÍCIO — SERVIDORES DE IA (NVIDIA CUDA)
+                </h2>
+                <p style="margin: 4px 0 0 0; font-size: 12px; color: #cbd5e1; line-height: 1.4;">
+                    Filtro estrito de arquitetura NVIDIA CUDA (12GB e 16GB VRAM) para execução de LLMs locais (Ollama, vLLM, PyTorch), geração de imagens e fine-tuning.
+                </p>
+            </div>
+            <div style="overflow-x: auto; background-color: #ffffff;">
+                <table style="width: 100%; border-collapse: collapse; text-align: left; min-width: 760px;">
+                    <thead>
+                        <tr style="background-color: #f1f5f9; color: #334155; border-bottom: 2px solid #cbd5e1;">
+                            <th style="padding: 10px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase;">RANK / LOJA</th>
+                            <th style="padding: 10px 12px; font-size: 11px; font-weight: 700; text-transform: uppercase;">COMPUTADOR / MODELO</th>
+                            <th style="padding: 10px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase;">GPU & VRAM</th>
+                            <th style="padding: 10px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; text-align: center;">CUSTO / GB VRAM</th>
+                            <th style="padding: 10px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; text-align: right;">PREÇO ATUAL</th>
+                            <th style="padding: 10px 12px; font-size: 11px; font-weight: 700; text-transform: uppercase;">VIABILIDADE P/ IA</th>
+                            <th style="padding: 10px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; text-align: center;">AÇÃO</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {rows_html}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        '''
+        return card_html
+
     def render_category_table(items: List[Dict[str, Any]], category_label: str, max_items: int = 8) -> str:
         if not items:
             return '<p style="color: #64748b; font-style: italic; padding: 10px 0; font-size: 13px;">Nenhuma oferta encontrada nesta categoria no momento.</p>'
@@ -147,6 +246,7 @@ def generate_html_report(data: Dict[str, Any]) -> str:
         '''
         return table_html
 
+    ai_ranking = data.get('ai_ranking', [])
     pcs_8gb = data.get('pcs_8gb', [])
     pcs_12gb = data.get('pcs_12gb', [])
     pcs_16gb = data.get('pcs_16gb', [])
@@ -155,6 +255,7 @@ def generate_html_report(data: Dict[str, Any]) -> str:
     ssds_1tb = data.get('ssds_1tb', [])
 
     # Destaques para a Análise de Mercado
+    best_ai = ai_ranking[0] if ai_ranking else None
     best_pc_12gb = pcs_12gb[0] if pcs_12gb else None
     best_pc_8gb = pcs_8gb[0] if pcs_8gb else None
     best_pc_16gb = pcs_16gb[0] if pcs_16gb else None
@@ -167,7 +268,7 @@ def generate_html_report(data: Dict[str, Any]) -> str:
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Relatório Diário de Preços - Hardware</title>
+    <title>Relatório Diário de Preços - Hardware & IA</title>
 </head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f1f5f9; margin: 0; padding: 25px 15px; color: #1e293b;">
     <div style="max-width: 860px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 16px rgba(15, 23, 42, 0.08); border: 1px solid #e2e8f0;">
@@ -197,7 +298,7 @@ def generate_html_report(data: Dict[str, Any]) -> str:
                                 </td>
                                 <td style="vertical-align: middle; text-align: left;">
                                     <div style="font-size: 16px; font-weight: 800; color: #0e2a47; line-height: 1.1;">RadarPreços</div>
-                                    <div style="font-size: 10px; color: #64748b; letter-spacing: 0.3px;">HARDWARE INTEL</div>
+                                    <div style="font-size: 10px; color: #64748b; letter-spacing: 0.3px;">HARDWARE & SERVIDORES IA</div>
                                 </td>
                             </tr>
                         </table>
@@ -207,47 +308,50 @@ def generate_html_report(data: Dict[str, Any]) -> str:
             
             <div style="margin-top: 22px;">
                 <h1 style="margin: 0; font-size: 22px; font-weight: 700; color: #0e2a47;">
-                    RELATÓRIO DIÁRIO DE PREÇOS - Radar Hardware
+                    RELATÓRIO DIÁRIO DE PREÇOS - Hardware & Servidores de IA
                 </h1>
                 <p style="margin: 6px 0 0 0; font-size: 14px; color: #475569;">
                     Olá, <strong>Yury</strong>,
                 </p>
                 <p style="margin: 4px 0 0 0; font-size: 13px; color: #64748b; line-height: 1.5;">
-                    Abaixo está o consolidado dos menores preços de hardware encontrados hoje nas maiores lojas do Brasil (Kabum, Terabyte, Pichau e Amazon), organizados rigorosamente por busca técnica.
+                    Abaixo está o consolidado com o <strong>Ranking Exclusivo para Servidor de IA (NVIDIA CUDA 12GB/16GB)</strong> e os menores preços encontrados nas maiores lojas do Brasil (Pichau, Kabum, Terabyte e Amazon).
                 </p>
             </div>
         </div>
 
         <div style="padding: 25px 30px;">
             
-            <!-- SEÇÃO 1: PCs 8GB VRAM -->
+            <!-- SEÇÃO DESTAQUE: RANKING SERVIDOR DE IA (NVIDIA CUDA) -->
+            {render_ai_ranking_table(ai_ranking, max_items=6)}
+
+            <!-- SEÇÃO 1: PCs 12GB VRAM (Exclusivo NVIDIA) -->
             <div style="margin-bottom: 25px;">
                 <div style="display: flex; align-items: center; margin-bottom: 10px;">
                     <h2 style="margin: 0; font-size: 16px; font-weight: 700; color: #0e2a47;">
-                        🖥️ Computadores Gamer — Placa de Vídeo de 8GB VRAM
+                        🚀 Computadores p/ IA & Games — Placa de Vídeo de 12GB VRAM (Exclusivo NVIDIA)
                     </h2>
                 </div>
-                {render_category_table(pcs_8gb, "PC Gamer 8GB", max_items=8)}
+                {render_category_table(pcs_12gb, "NVIDIA 12GB", max_items=8)}
             </div>
 
-            <!-- SEÇÃO 2: PCs 12GB VRAM -->
+            <!-- SEÇÃO 2: PCs 16GB VRAM (Exclusivo NVIDIA) -->
             <div style="margin-bottom: 25px;">
                 <div style="display: flex; align-items: center; margin-bottom: 10px;">
                     <h2 style="margin: 0; font-size: 16px; font-weight: 700; color: #0e2a47;">
-                        🚀 Computadores Gamer — Placa de Vídeo de 12GB VRAM
+                        ⚡ Computadores p/ IA & Games — Placa de Vídeo de 16GB VRAM (Exclusivo NVIDIA)
                     </h2>
                 </div>
-                {render_category_table(pcs_12gb, "PC Gamer 12GB", max_items=8)}
+                {render_category_table(pcs_16gb, "NVIDIA 16GB", max_items=8)}
             </div>
 
-            <!-- SEÇÃO 3: PCs 16GB VRAM -->
+            <!-- SEÇÃO 3: PCs 8GB VRAM (NVIDIA e AMD) -->
             <div style="margin-bottom: 25px;">
                 <div style="display: flex; align-items: center; margin-bottom: 10px;">
                     <h2 style="margin: 0; font-size: 16px; font-weight: 700; color: #0e2a47;">
-                        ⚡ Computadores Gamer — Placa de Vídeo de 16GB VRAM
+                        🎮 Computadores de Entrada — Placa de Vídeo de 8GB VRAM (NVIDIA e AMD)
                     </h2>
                 </div>
-                {render_category_table(pcs_16gb, "PC Gamer 16GB", max_items=8)}
+                {render_category_table(pcs_8gb, "PC 8GB (NV/AMD)", max_items=8)}
             </div>
 
             <!-- SEÇÃO 4: Memórias RAM 16GB DDR4 -->
@@ -283,22 +387,21 @@ def generate_html_report(data: Dict[str, Any]) -> str:
             <!-- ANÁLISE DE MERCADO (ÚLTIMAS 24H) - Conforme imagem TechCorp -->
             <div style="margin-top: 35px; border-top: 2px solid #e2e8f0; padding-top: 22px;">
                 <h3 style="margin: 0 0 12px 0; font-size: 14px; font-weight: 700; color: #0e2a47; text-transform: uppercase; letter-spacing: 0.5px;">
-                    ANÁLISE DE MERCADO (ÚLTIMAS 24H)
+                    ANÁLISE DE MERCADO (ÚLTIMAS 24H) & RECOMENDAÇÕES PARA SERVIDOR DE IA
                 </h3>
                 
                 <ul style="margin: 0 0 18px 0; padding-left: 20px; color: #334155; font-size: 13px; line-height: 1.6;">
-                    <li><strong>Key Trends (PCs 12GB VRAM):</strong> A <strong>Pichau</strong> e a <strong>Kabum</strong> lideram com o melhor custo-benefício gráfico para jogos modernos com a GeForce RTX 3060 12GB a partir de <strong>{format_currency(best_pc_12gb.get('price', 0)) if best_pc_12gb else 'R$ 4.299,00'}</strong> à vista no PIX.</li>
-                    <li><strong>Key Trends (PCs 8GB VRAM):</strong> A <strong>TerabyteShop</strong> domina a faixa de entrada mais econômica a partir de <strong>{format_currency(best_pc_8gb.get('price', 0)) if best_pc_8gb else 'R$ 1.899,99'}</strong> com RX 580 8GB, enquanto a Pichau oferece configurações atualizadas com RX 7600 a R$ 3.749,96.</li>
-                    <li><strong>Key Trends (PCs 16GB VRAM):</strong> Menor preço em máquinas topo de linha liderado pela TerabyteShop com Radeon RX 9060 XT 16GB por <strong>{format_currency(best_pc_16gb.get('price', 0)) if best_pc_16gb else 'R$ 6.859,99'}</strong>.</li>
-                    <li><strong>Key Trends (RAM 16GB DDR4):</strong> Disputa acirrada entre <strong>TerabyteShop</strong> ({format_currency(best_ram.get('price', 0)) if best_ram else 'R$ 679,99'}) e <strong>Pichau</strong> (R$ 699,99) pelo menor valor nacional em pentes de 16GB DDR4 3200MHz.</li>
-                    <li><strong>Key Trends (Armazenamento SSD):</strong> A <strong>Amazon</strong> lidera a categoria de 480GB/512GB com Western Digital WD Green por <strong>{format_currency(best_ssd_512.get('price', 0)) if best_ssd_512 else 'R$ 394,25'}</strong>, e a Terabyte/Pichau assumem a faixa de 1TB por <strong>{format_currency(best_ssd_1tb.get('price', 0)) if best_ssd_1tb else 'R$ 759,90'}</strong>.</li>
+                    <li><strong>Melhor Custo/Benefício para Servidor de IA:</strong> O modelo <strong>{best_ai.get('title') if best_ai else 'PC Gamer Mancer Befana'}</strong> na <strong>{best_ai.get('store', 'Pichau') if best_ai else 'Pichau'}</strong> lidera o ranking nacional com <strong>{f"R$ {best_ai.get('cost_per_gb', 354.08):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")} por GB de VRAM</strong> ({format_currency(best_ai.get('price', 4248.97)) if best_ai else 'R$ 4.248,97'} no PIX), sendo a melhor porta de entrada do Brasil para rodar LLaMA-3 8B, Mistral 7B e SDXL localmente via Ollama/vLLM.</li>
+                    <li><strong>GPUs NVIDIA 12GB vs 16GB:</strong> As máquinas com <strong>RTX 3060 12GB</strong> oferecem o menor desembolso total, enquanto configurações com <strong>RTX 4060 Ti 16GB / RTX 4070 Ti Super 16GB</strong> são recomendadas caso o seu servidor vá executar modelos de 14B parâmetros (como Qwen 2.5 14B) ou fine-tuning LoRA.</li>
+                    <li><strong>PCs 8GB VRAM (NVIDIA e AMD):</strong> A <strong>TerabyteShop</strong> domina a faixa de entrada mais econômica a partir de <strong>{format_currency(best_pc_8gb.get('price', 0)) if best_pc_8gb else 'R$ 1.899,99'}</strong> com RX 580 8GB, e a Pichau oferece alternativas com RX 7600 a R$ 3.749,96.</li>
+                    <li><strong>Memória RAM & SSD para o Servidor:</strong> A <strong>TerabyteShop</strong> ({format_currency(best_ram.get('price', 0)) if best_ram else 'R$ 679,99'}) e <strong>Pichau</strong> (R$ 699,99) disputam o menor preço de 16GB DDR4 3200MHz. Para armazenamento de modelos de IA (GGUF/Safetensors), a <strong>Amazon</strong> lidera em SSDs de 512GB ({format_currency(best_ssd_512.get('price', 0)) if best_ssd_512 else 'R$ 394,25'}) e a Terabyte/Pichau em 1TB ({format_currency(best_ssd_1tb.get('price', 0)) if best_ssd_1tb else 'R$ 759,90'}).</li>
                 </ul>
 
                 <h4 style="margin: 0 0 8px 0; font-size: 13px; font-weight: 700; color: #0e2a47;">
-                    Ações Recomendadas
+                    Ações Recomendadas para Servidor de IA
                 </h4>
-                <div style="background-color: #f8fafc; border-left: 4px solid #0e2a47; padding: 12px 16px; border-radius: 4px; font-size: 13px; color: #334155; line-height: 1.5;">
-                    🎯 <strong>Oportunidades em Destaque:</strong> Momento propício para aquisição de memórias RAM 16GB DDR4 3200MHz na Pichau/Terabyte ({format_currency(best_ram.get('price', 0)) if best_ram else 'R$ 679,99'}) e SSDs WD Green na Amazon. Para computadores prontos com garantia de 12 meses, a melhor escolha em custo/longevidade é o PC Pichau Vidar ou Kabum 2eletro com RTX 3060 12GB.
+                <div style="background-color: #f8fafc; border-left: 4px solid #2563eb; padding: 14px 18px; border-radius: 4px; font-size: 13px; color: #1e293b; line-height: 1.5;">
+                    💡 <strong>Setup de Software Recomendado:</strong> Para hospedar IA na máquina escolhida, configure <strong>Ubuntu Server</strong> ou <strong>WSL2 no Windows</strong> com os drivers NVIDIA mais recentes. Utilize o container oficial do <strong>Ollama</strong> (porta 11434) para inferência simplificada de modelos GGUF (Q4_K_M) ou <strong>vLLM</strong> para obter máxima taxa de tokens/segundo via API compatível com OpenAI.
                 </div>
             </div>
 
@@ -308,7 +411,7 @@ def generate_html_report(data: Dict[str, Any]) -> str:
                     <tr>
                         <td style="font-size: 11px; color: #64748b; vertical-align: middle;">
                             <strong>RadarPreços Global</strong><br>
-                            Monitoramento Automatizado de Hardware • Brasil
+                            Monitoramento Automatizado de Hardware & Inteligência Artificial • Brasil
                         </td>
                         <td style="text-align: right; font-size: 11px; color: #64748b; vertical-align: middle;">
                             <span style="text-decoration: underline; color: #475569;">Gestão de Preferências</span> &nbsp;|&nbsp;
@@ -330,12 +433,11 @@ def generate_html_report(data: Dict[str, Any]) -> str:
 def send_email_alert(data: Dict[str, Any]) -> bool:
     """Dispara o e-mail via SMTP usando variáveis de ambiente."""
     sender_email = os.getenv('SENDER_EMAIL')
-    sender_password = os.getenv('SENDER_PASSWORD') # Senha de app do Gmail
+    sender_password = os.getenv('SENDER_PASSWORD')
     receiver_email = os.getenv('RECEIVER_EMAIL', sender_email)
     smtp_server = os.getenv('SMTP_SERVER', 'smtp.gmail.com')
     smtp_port = int(os.getenv('SMTP_PORT', '465'))
 
-    # Salva sempre uma cópia local para inspeção/teste em html
     html_body = generate_html_report(data)
     try:
         with open("ultimo_relatorio.html", "w", encoding="utf-8") as f:
@@ -349,7 +451,7 @@ def send_email_alert(data: Dict[str, Any]) -> bool:
         return False
 
     msg = MIMEMultipart('alternative')
-    msg['Subject'] = f"📊 RELATÓRIO DIÁRIO DE PREÇOS - Hardware ({datetime.now().strftime('%d/%m/%Y')})"
+    msg['Subject'] = f"🧠 RADAR DE HARDWARE & SERVIDORES DE IA ({datetime.now().strftime('%d/%m/%Y')})"
     msg['From'] = f"RadarPreços Bot <{sender_email}>"
     msg['To'] = receiver_email
 
