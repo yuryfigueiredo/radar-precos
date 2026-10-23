@@ -42,17 +42,23 @@ class KabumScraper:
         results = []
         seen_codes = set()
         queries = [
-            "computador gamer rx 6600",
-            "computador gamer rtx 4060",
-            "computador gamer rtx 3060",
-            "computador gamer rtx 4070",
-            "computador gamer rx 7700",
-            "computador gamer rx 7800",
-            "computador gamer rx 7600 xt"
+            ("computador gamer rx 6600", True),
+            ("computador gamer rtx 4060", True),
+            ("pc gamer rtx 3060", False),
+            ("pc gamer rtx 4070", False),
+            ("pc gamer rx 6750 xt", False),
+            ("pc gamer rx 7700 xt", False),
+            ("pc gamer rx 7600 xt", False),
+            ("pc gamer rx 7800 xt", False),
+            ("pc gamer rtx 4070 ti super", False),
+            ("pc gamer rtx 4080", False)
         ]
         
-        for q in queries:
-            url = f"https://www.kabum.com.br/busca/{q.replace(' ', '-')}?page_number=1&page_size=25&sort=price&direction=asc"
+        for q, sort_asc in queries:
+            if sort_asc:
+                url = f"https://www.kabum.com.br/busca/{q.replace(' ', '-')}?page_number=1&page_size=30&sort=price&direction=asc"
+            else:
+                url = f"https://www.kabum.com.br/busca/{q.replace(' ', '-')}?page_number=1&page_size=30"
             items = self._fetch_next_data(url)
             for item in items:
                 code = item.get('code')

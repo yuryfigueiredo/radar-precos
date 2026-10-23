@@ -13,9 +13,9 @@ class PichauScraper:
         seen_links = set()
         urls = [
             "https://www.pichau.com.br/computadores/pichau-gamer?sort=price-asc",
-            "https://www.pichau.com.br/search?q=computador+gamer+rx+6600&sort=price-asc",
-            "https://www.pichau.com.br/search?q=computador+gamer+rtx+4060&sort=price-asc",
-            "https://www.pichau.com.br/search?q=computador+gamer+rtx+3060&sort=price-asc"
+            "https://www.pichau.com.br/search?q=pc+gamer+rtx+3060&sort=price-asc",
+            "https://www.pichau.com.br/search?q=pc+gamer+rtx+4070&sort=price-asc",
+            "https://www.pichau.com.br/search?q=pc+gamer+rx+7600+xt&sort=price-asc"
         ]
         
         async with async_playwright() as p:
@@ -33,7 +33,7 @@ class PichauScraper:
                     await page.goto(url, timeout=30000, wait_until="domcontentloaded")
                     await page.wait_for_timeout(3000)
                     
-                    cards = page.locator('a[href*="/computador-"]')
+                    cards = page.locator('a[data-cy*="product"], a[href*="/computador-"], a[href*="/pc-gamer-"]')
                     count = await cards.count()
                     
                     for i in range(min(count, 15)):

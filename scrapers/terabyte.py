@@ -54,11 +54,14 @@ class TerabyteScraper:
         queries = [
             "computador gamer rx 6600",
             "computador gamer rtx 4060",
-            "computador gamer rtx 3060",
-            "computador gamer rtx 4070",
-            "computador gamer rx 7700",
-            "computador gamer rx 7600 xt",
-            "computador gamer rx 7800"
+            "pc gamer rtx 3060",
+            "pc gamer rtx 4070",
+            "pc gamer rx 6750 xt",
+            "pc gamer rx 7700 xt",
+            "pc gamer rx 7600 xt",
+            "pc gamer rx 7800 xt",
+            "pc gamer rtx 4070 ti super",
+            "pc gamer rtx 4080"
         ]
         seen_links = set()
         
