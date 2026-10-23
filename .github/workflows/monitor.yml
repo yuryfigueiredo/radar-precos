@@ -10,7 +10,8 @@ on:
 
 jobs:
   run-price-radar:
-    runs-on: ubuntu-latest
+    # Executa no runner local (IP brasileiro residencial para evitar bloqueios Cloudflare da Pichau)
+    runs-on: [self-hosted, windows]
 
     steps:
       - name: Checkout do Repositório
@@ -26,7 +27,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          playwright install chromium --with-deps
+          playwright install chromium
 
       - name: Restaurar Histórico de Preços
         uses: actions/cache@v4
