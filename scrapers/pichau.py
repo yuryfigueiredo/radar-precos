@@ -56,13 +56,25 @@ class PichauScraper:
                     if not vram:
                         continue
                         
-                    prices_found = [clean_price(p) for p in re.findall(r'R\$\s*([\d\.,]+)', raw_text) if clean_price(p)]
-                    # Ignora valores de parcelas menores (ex: 12x de R$ 300) pegando preços reais à vista >= 1500
-                    cash_prices = [p for p in prices_found if p >= 1500]
-                    if not cash_prices:
-                        continue
+                    # 1. Preço à vista no PIX prioritário da Pichau
+                    price = None
+                    price_vista_el = card.locator('div[class*="price_vista"]')
+                    if await price_vista_el.count() > 0:
+                        price = clean_price(await price_vista_el.first.inner_text())
                         
-                    price = min(cash_prices)
+                    if not price:
+                        m_pix = re.search(r'R\$\s*([\d\.,]+)\s*(?:a partir de\s*)?(?:[0-9]+%\s*de\s*desconto\s*no\s*PIX|no\s*PIX|à\s*vista)', raw_text, re.IGNORECASE)
+                        if m_pix:
+                            price = clean_price(m_pix.group(1))
+                            
+                    if not price:
+                        prices_found = [clean_price(p) for p in re.findall(r'R\$\s*([\d\.,]+)', raw_text) if clean_price(p)]
+                        cash_prices = [p for p in prices_found if p >= 1500]
+                        if cash_prices:
+                            price = min(cash_prices)
+                            
+                    if not price or price < 1500:
+                        continue
                     seen_links.add(href)
                     results.append({
                         'title': title,
@@ -133,13 +145,25 @@ class PichauScraper:
                     if not cap:
                         continue
                         
-                    prices_found = [clean_price(p) for p in re.findall(r'R\$\s*([\d\.,]+)', raw_text) if clean_price(p)]
-                    # Filtra preços válidos de SSD (entre R$ 80 e R$ 1500) descartando parcelas
-                    valid_prices = [p for p in prices_found if 80 <= p <= 1500]
-                    if not valid_prices:
-                        continue
+                    # 1. Preço à vista no PIX prioritário da Pichau
+                    price = None
+                    price_vista_el = card.locator('div[class*="price_vista"]')
+                    if await price_vista_el.count() > 0:
+                        price = clean_price(await price_vista_el.first.inner_text())
                         
-                    price = min(valid_prices)
+                    if not price:
+                        m_pix = re.search(r'R\$\s*([\d\.,]+)\s*(?:a partir de\s*)?(?:[0-9]+%\s*de\s*desconto\s*no\s*PIX|no\s*PIX|à\s*vista)', raw_text, re.IGNORECASE)
+                        if m_pix:
+                            price = clean_price(m_pix.group(1))
+                            
+                    if not price:
+                        prices_found = [clean_price(p) for p in re.findall(r'R\$\s*([\d\.,]+)', raw_text) if clean_price(p)]
+                        valid_prices = [p for p in prices_found if 80 <= p <= 1500]
+                        if valid_prices:
+                            price = min(valid_prices)
+                            
+                    if not price or not (80 <= price <= 1500):
+                        continue
                     seen_links.add(href)
                     results.append({
                         'title': title,
@@ -208,12 +232,25 @@ class PichauScraper:
                     if not is_valid_ram_16gb_ddr4(title):
                         continue
                         
-                    prices_found = [clean_price(p) for p in re.findall(r'R\$\s*([\d\.,]+)', raw_text) if clean_price(p)]
-                    valid_prices = [p for p in prices_found if 80 <= p <= 1000]
-                    if not valid_prices:
-                        continue
+                    # 1. Preço à vista no PIX prioritário da Pichau
+                    price = None
+                    price_vista_el = card.locator('div[class*="price_vista"]')
+                    if await price_vista_el.count() > 0:
+                        price = clean_price(await price_vista_el.first.inner_text())
                         
-                    price = min(valid_prices)
+                    if not price:
+                        m_pix = re.search(r'R\$\s*([\d\.,]+)\s*(?:a partir de\s*)?(?:[0-9]+%\s*de\s*desconto\s*no\s*PIX|no\s*PIX|à\s*vista)', raw_text, re.IGNORECASE)
+                        if m_pix:
+                            price = clean_price(m_pix.group(1))
+                            
+                    if not price:
+                        prices_found = [clean_price(p) for p in re.findall(r'R\$\s*([\d\.,]+)', raw_text) if clean_price(p)]
+                        valid_prices = [p for p in prices_found if 80 <= p <= 1000]
+                        if valid_prices:
+                            price = min(valid_prices)
+                            
+                    if not price or not (80 <= price <= 1000):
+                        continue
                     seen_links.add(href)
                     results.append({
                         'title': title,

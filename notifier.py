@@ -25,7 +25,7 @@ def generate_html_report(data: Dict[str, Any]) -> str:
         'Mercado Livre': '#000000'
     }
 
-    def render_items(items: List[Dict[str, Any]], max_items: int = 5) -> str:
+    def render_items(items: List[Dict[str, Any]], max_items: int = 8) -> str:
         if not items:
             return '<p style="color: #666; font-style: italic;">Nenhum produto encontrado nesta categoria no momento.</p>'
         

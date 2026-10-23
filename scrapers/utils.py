@@ -50,34 +50,37 @@ def classify_pc_vram(title: str, description: str = "") -> Optional[str]:
 
     # Se a GPU for explicitamente de 2GB, 4GB ou 6GB (ex: RX 550, RX 560, GTX 1650, GTX 1050, GTX 1060, GTX 1660, RTX 3050 6GB), descarta
     if re.search(r'\b(RX\s*550|RX\s*560|GTX\s*1650|GTX\s*1050|GTX\s*1060|GTX\s*1660|RTX\s*3050\s*6\s*GB|RTX\s*2060\s*6\s*GB|4\s*GB\s*DEDICADA|4\s*GB\s*VRAM|6\s*GB\s*VRAM|6\s*GB\s*DEDICADA)\b', t):
-        if not re.search(r'\b(RTX\s*3060|RTX\s*40|RX\s*6600|RX\s*7600|RX\s*580|RX\s*570)\b', t):
+        if not re.search(r'\b(RTX\s*(?:3060|3070|3080|40|50)|RX\s*(?:6600|7600|7650|7700|7800|90))\b', t):
             return None
 
     # 1. GPUs de 16GB VRAM
-    # Modelos: RTX 4070 Ti Super, RTX 4080 (Super), RX 7800 XT, RX 7900 GRE, RX 7600 XT, RX 6800, RX 6800 XT, RX 6900 XT, RX 6950 XT, Arc A770 16GB, RX 9060 XT 16GB
-    if re.search(r'\b(RTX\s*4070\s*TI\s*SUPER|RTX\s*4080|RX\s*7800\s*XT|RX\s*7900\s*GRE|RX\s*7600\s*XT|RX\s*6800\s*XT|RX\s*6800|RX\s*6900\s*XT|RX\s*6950\s*XT|ARC\s*A770\s*16\s*GB|RX\s*9060\s*XT\s*16\s*GB)\b', t):
+    if re.search(r'\b(RTX\s*5080|RTX\s*5070\s*TI|RTX\s*4090|RTX\s*4080|RTX\s*4070\s*TI\s*SUPER|RX\s*9070|RX\s*7900|RX\s*7800\s*XT|RX\s*7600\s*XT|RX\s*6950|RX\s*6900|RX\s*6800|ARC\s*A770\s*16\s*GB|RX\s*9060\s*XT\s*16\s*GB)\b', t):
         return '16GB'
-    if re.search(r'\bRTX\s*4060\s*TI\b', t) and re.search(r'\b16\s*GB\b', t):
+    if re.search(r'\b(RTX\s*4060\s*TI|RTX\s*5060\s*TI)\b', t) and re.search(r'\b16\s*GB\b(?!.*(?:DDR|RAM))', t):
         return '16GB'
     if re.search(r'\b16\s*GB\s*(?:VRAM|DEDICADA)\b', t):
         return '16GB'
+    if re.search(r'(?:RTX|RX|RADEON|GEFORCE|ARC)\s+[A-Z0-9\s]+?\b16\s*GB\b(?!.*(?:DDR|RAM))', t):
+        return '16GB'
 
     # 2. GPUs de 12GB VRAM
-    # Modelos: RTX 3060 (desktop padrão é 12GB a menos que explicitamente 8GB), RTX 4070, RTX 4070 Super, RTX 4070 Ti (não Super), RX 6700 XT, RX 6750 XT, RX 7700 XT, RTX 3080 12GB, RTX 3080 Ti
-    if re.search(r'\b(RTX\s*4070\s*TI(?!\s*SUPER)|RTX\s*4070\s*SUPER|RTX\s*4070(?!\s*TI)|RX\s*6700\s*XT|RX\s*6750\s*XT|RX\s*7700\s*XT|RTX\s*3080\s*TI|RTX\s*3080\s*12\s*GB)\b', t):
+    if re.search(r'\b(RTX\s*5070(?!\s*TI)|RTX\s*4070\s*TI(?!\s*SUPER)|RTX\s*4070\s*SUPER|RTX\s*4070(?!\s*TI)|RX\s*7700\s*XT|RX\s*6750\s*XT|RX\s*6700\s*XT|RTX\s*3080\s*TI|RTX\s*3080\s*12\s*GB|ARC\s*B580)\b', t):
         return '12GB'
     if re.search(r'\bRTX\s*3060\b', t) and not re.search(r'\bRTX\s*3060\s*8\s*GB\b', t):
         return '12GB'
     if re.search(r'\b12\s*GB\s*(?:VRAM|DEDICADA)\b', t):
         return '12GB'
+    if re.search(r'(?:RTX|RX|RADEON|GEFORCE|ARC)\s+[A-Z0-9\s]+?\b12\s*GB\b(?!.*(?:DDR|RAM))', t):
+        return '12GB'
 
     # 3. GPUs de 8GB VRAM
-    # Modelos: RX 6600, RX 6600 XT, RX 6650 XT, RTX 4060 (exceto Ti 16GB), RTX 3060 8GB, RTX 3050 (8GB), RX 7600 (exceto XT), RX 580, RX 590, RX 570, Arc A580, Arc A750
-    if re.search(r'\b(RX\s*6600|RX\s*6600\s*XT|RX\s*6650\s*XT|RTX\s*4060(?!\s*TI\s*16)|RTX\s*3060\s*8\s*GB|RTX\s*3050|RX\s*7600(?!\s*XT)|RX\s*580|RX\s*590|RX\s*570|ARC\s*A580|ARC\s*A750)\b', t):
+    if re.search(r'\b(RTX\s*5060(?!\s*TI\s*16)|RTX\s*5050|RTX\s*4060(?!\s*TI\s*16)|RTX\s*3070|RTX\s*3060\s*8\s*GB|RTX\s*3050|RTX\s*2070|RTX\s*2060\s*SUPER|RX\s*9050|RX\s*7650|RX\s*7600(?!\s*XT)|RX\s*6650|RX\s*6600|RX\s*580|RX\s*590|RX\s*570|ARC\s*A580|ARC\s*A750)\b', t):
         if re.search(r'\bRTX\s*3050\s*6\s*GB\b', t) or (re.search(r'\bRTX\s*3050\b', t) and re.search(r'\b6\s*GB\b', t)):
             return None
         return '8GB'
     if re.search(r'\b8\s*GB\s*(?:VRAM|DEDICADA)\b', t):
+        return '8GB'
+    if re.search(r'(?:RTX|RX|RADEON|GEFORCE|ARC)\s+[A-Z0-9\s]+?\b8\s*GB\b(?!.*(?:DDR|RAM))', t):
         return '8GB'
 
     return None

@@ -124,27 +124,27 @@ async def run_radar():
     print("=" * 60)
     
     print("\n[PCs COM 8GB VRAM]:")
-    for p in pcs_8gb[:5]:
+    for p in pcs_8gb[:8]:
         print(f"  [{p['store']}] {format_currency(p['price'])} - {p['title'][:65]}")
         
     print("\n[PCs COM 12GB VRAM]:")
-    for p in pcs_12gb[:5]:
+    for p in pcs_12gb[:8]:
         print(f"  [{p['store']}] {format_currency(p['price'])} - {p['title'][:65]}")
 
     print("\n[PCs COM 16GB VRAM]:")
-    for p in pcs_16gb[:5]:
+    for p in pcs_16gb[:8]:
         print(f"  [{p['store']}] {format_currency(p['price'])} - {p['title'][:65]}")
 
     print("\n[MEMORIAS RAM 16GB DDR4 GAMER]:")
-    for r in rams_16gb[:8]:
+    for r in rams_16gb[:10]:
         print(f"  [{r['store']}] {format_currency(r['price'])} - {r['title'][:65]}")
 
     print("\n[SSDs 512GB]:")
-    for s in ssds_512[:5]:
+    for s in ssds_512[:8]:
         print(f"  [{s['store']}] {format_currency(s['price'])} - {s['title'][:65]}")
 
     print("\n[SSDs 1TB]:")
-    for s in ssds_1tb[:5]:
+    for s in ssds_1tb[:8]:
         print(f"  [{s['store']}] {format_currency(s['price'])} - {s['title'][:65]}")
         
     print("=" * 60 + "\n")
