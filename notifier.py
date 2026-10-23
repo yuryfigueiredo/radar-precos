@@ -87,7 +87,12 @@ def generate_html_report(data: Dict[str, Any]) -> str:
                 rank_badge = f'<span style="background: #f1f5f9; color: #64748b; font-weight: 700; font-size: 11px; padding: 3px 7px; border-radius: 4px; display: inline-block;">#{i+1}</span>'
                 
             row_bg = "#ffffff" if i % 2 == 0 else "#f8fafc"
-            clean_price_val = f"{item.get('price', 0):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            final_price_32gb = item.get('final_price_32gb', item.get('price', 0))
+            final_price_val = f"{final_price_32gb:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            base_price_val = f"{item.get('price', 0):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            custom_diff = item.get('custom_diff', 0.0)
+            ram_status_tag = item.get('ram_status_tag', '32GB Nativo de Fábrica')
+            
             cost_gb = item.get('cost_per_gb', 0)
             cost_gb_str = f"R$ {cost_gb:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
             gpu_name = item.get('gpu_name', 'NVIDIA GPU')
@@ -95,58 +100,10 @@ def generate_html_report(data: Dict[str, Any]) -> str:
             ai_rec = item.get('ai_recommendation', 'Compatível com modelos LLM locais (Ollama / vLLM)')
             warranty = item.get('warranty', 'Garantia Oficial')
 
-            # Dados de Upgrade de RAM para 32GB
+            # Dados de Placa-mãe
             ram_info = item.get('ram_info') or {}
-            site_custom = ram_info.get('site_custom') or {}
             mobo = ram_info.get('mobo', 'M-ATX')
             slots = ram_info.get('slots', 2)
-            ram_desc = ram_info.get('ram_desc', '16GB')
-            status_label = ram_info.get('status_label', 'Slots Ocupados (2x8GB)')
-            badge_bg = ram_info.get('badge_bg', '#fef3c7')
-            badge_color = ram_info.get('badge_color', '#b45309')
-            extra_cost = ram_info.get('extra_cost', 600.0)
-            est_total_32gb = ram_info.get('est_total_32gb', item.get('price', 0) + extra_cost)
-            est_total_str = f"R$ {est_total_32gb:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-
-            # Bloco de disponibilidade no configurador da loja (Vir montado)
-            if site_custom:
-                site_label = site_custom.get('site_status_label', 'Indisponível no site')
-                site_bg = site_custom.get('site_badge_bg', '#fee2e2')
-                site_color = site_custom.get('site_badge_color', '#991b1b')
-                site_avail = site_custom.get('site_customization_available', False)
-                site_total = site_custom.get('site_assembled_total', item.get('price', 0))
-                site_total_str = f"R$ {site_total:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-                
-                if site_avail:
-                    site_html = f'''
-                    <div style="margin-bottom: 4px;">
-                        <span style="background-color: {site_bg}; color: {site_color}; font-weight: 800; font-size: 10px; padding: 2px 6px; border-radius: 4px; display: inline-block;">
-                            {site_label}
-                        </span>
-                        <div style="font-size: 11px; color: #15803d; font-weight: 700; margin-top: 2px;">
-                            Total Montado: ~{site_total_str}
-                        </div>
-                    </div>
-                    '''
-                else:
-                    site_html = f'''
-                    <div style="margin-bottom: 4px;">
-                        <span style="background-color: {site_bg}; color: {site_color}; font-weight: 800; font-size: 10px; padding: 2px 6px; border-radius: 4px; display: inline-block;">
-                            {site_label}
-                        </span>
-                        <div style="font-size: 10px; color: #991b1b; margin-top: 2px;">
-                            Não é possível comprar já montado
-                        </div>
-                    </div>
-                    '''
-            else:
-                site_html = f'''
-                <div style="margin-bottom: 4px;">
-                    <span style="background-color: #f1f5f9; color: #475569; font-weight: 700; font-size: 10px; padding: 2px 6px; border-radius: 4px; display: inline-block;">
-                        ⚪ Consultar loja
-                    </span>
-                </div>
-                '''
 
             rows_html += f'''
             <tr style="background-color: {row_bg}; border-bottom: 1px solid #e2e8f0;">
@@ -171,18 +128,21 @@ def generate_html_report(data: Dict[str, Any]) -> str:
                         {cost_gb_str} / GB
                     </span>
                 </td>
-                <td style="padding: 12px 10px; font-size: 14px; font-weight: 800; color: #0e2a47; text-align: right; white-space: nowrap; vertical-align: middle;">
-                    {clean_price_val}
+                <td style="padding: 12px 10px; font-size: 14px; font-weight: 800; color: #047857; text-align: right; white-space: nowrap; vertical-align: middle;">
+                    R$ {final_price_val}
+                    <div style="font-size: 10px; color: #64748b; font-weight: normal; margin-top: 2px;">
+                        Base: R$ {base_price_val} {f"(+{format_currency(custom_diff)})" if custom_diff > 0 else "(Nativo)"}
+                    </div>
                 </td>
                 <td style="padding: 12px 10px; font-size: 11px; vertical-align: middle; white-space: nowrap;">
-                    {site_html}
-                    <div style="border-top: 1px dashed #cbd5e1; padding-top: 4px; margin-top: 4px;">
-                        <div style="font-size: 10px; color: #64748b;">
-                            Placa: <b>{mobo}</b> ({slots} slots) • Padrão: <b>{ram_desc}</b>
-                        </div>
-                        <div style="font-size: 11px; color: #047857; font-weight: 700; margin-top: 1px;">
-                            Manual: ~{est_total_str} ({status_label})
-                        </div>
+                    <span style="background-color: #dcfce7; color: #15803d; font-weight: 800; font-size: 10px; padding: 2px 7px; border-radius: 4px; display: inline-block; margin-bottom: 3px;">
+                        ✅ 32GB Habilitado
+                    </span>
+                    <div style="font-size: 11px; color: #334155; font-weight: 600;">
+                        {ram_status_tag}
+                    </div>
+                    <div style="font-size: 10px; color: #64748b; margin-top: 2px;">
+                        Placa: <b>{mobo}</b> ({slots} slots)
                     </div>
                 </td>
                 <td style="padding: 12px 12px; font-size: 11px; color: #334155; line-height: 1.4; vertical-align: middle; max-width: 190px;">
@@ -200,13 +160,13 @@ def generate_html_report(data: Dict[str, Any]) -> str:
         <div style="margin-bottom: 30px; border: 2px solid #2563eb; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 14px rgba(37, 99, 235, 0.12);">
             <div style="background: linear-gradient(135deg, #0e2a47 0%, #1e3a8a 100%); padding: 16px 20px; color: #ffffff;">
                 <span style="background-color: #38bdf8; color: #082f49; font-size: 10px; font-weight: 800; padding: 2px 8px; border-radius: 12px; text-transform: uppercase; letter-spacing: 0.5px; display: inline-block; margin-bottom: 5px;">
-                    CUDA ACCELERATED • IA & LLM SERVER
+                    CUDA ACCELERATED • 32GB+ RAM MONTADO • SERVIDORES DE IA
                 </span>
                 <h2 style="margin: 0; font-size: 17px; font-weight: 800; color: #ffffff;">
-                    🧠 RANKING CUSTO-BENEFÍCIO — SERVIDORES DE IA (NVIDIA CUDA)
+                    🧠 RANKING CUSTO-BENEFÍCIO — SERVIDORES DE IA (NVIDIA CUDA + 32GB RAM MONTADO)
                 </h2>
                 <p style="margin: 4px 0 0 0; font-size: 12px; color: #cbd5e1; line-height: 1.4;">
-                    Filtro estrito de arquitetura NVIDIA CUDA (12GB e 16GB VRAM) para execução de LLMs locais (Ollama, vLLM, PyTorch) com análise de viabilidade de upgrade para 32GB de memória RAM.
+                    Filtro estrito para Servidores de IA: Exclusivo <b>NVIDIA CUDA (12GB e 16GB VRAM)</b> e <b>OBRIGATORIAMENTE com 32GB de memória RAM disponível para vir montado pela loja</b>. O ranking é ordenado pelo menor custo por GB de VRAM já considerando o valor final da máquina pronta com 32GB.
                 </p>
             </div>
             <div style="overflow-x: auto; background-color: #ffffff;">
@@ -217,8 +177,8 @@ def generate_html_report(data: Dict[str, Any]) -> str:
                             <th style="padding: 10px 12px; font-size: 11px; font-weight: 700; text-transform: uppercase;">COMPUTADOR / MODELO</th>
                             <th style="padding: 10px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase;">GPU & VRAM</th>
                             <th style="padding: 10px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; text-align: center;">CUSTO / GB VRAM</th>
-                            <th style="padding: 10px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; text-align: right;">PREÇO ATUAL</th>
-                            <th style="padding: 10px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase;">UPGRADE 32GB (IA)</th>
+                            <th style="padding: 10px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; text-align: right;">PREÇO MONTADO (32GB)</th>
+                            <th style="padding: 10px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase;">MEMÓRIA 32GB NO SITE</th>
                             <th style="padding: 10px 12px; font-size: 11px; font-weight: 700; text-transform: uppercase;">VIABILIDADE P/ IA</th>
                             <th style="padding: 10px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; text-align: center;">AÇÃO</th>
                         </tr>
@@ -229,10 +189,7 @@ def generate_html_report(data: Dict[str, Any]) -> str:
                 </table>
             </div>
             <div style="background-color: #eff6ff; border-top: 1px solid #bfdbfe; padding: 12px 18px; font-size: 12px; color: #1e40af; line-height: 1.5;">
-                💡 <b>Dica de Custo-Benefício para 32GB de RAM:</b>
-                No configurador da loja (botão <i>"Alterar"</i>), cobram até <b>+R$ 777,40</b> para colocar 32GB. 
-                <b>Não faça pelo configurador!</b> É muito mais econômico comprar a máquina original e adquirir a memória avulsa na seção de <i>RAMs 16GB DDR4</i> abaixo:
-                se o PC tiver 1 slot vago, você só gasta <b>~R$ 320</b> (economia de mais de R$ 450!). Se os 2 slots estiverem cheios (2x8GB), compre um kit 2x16GB por ~R$ 600 e venda as memórias originais.
+                💡 <b>Critério deste Ranking:</b> Apenas computadores que você consegue comprar junto e receber <b>100% montados com 32GB de RAM ou mais</b>. Máquinas com opções esgotadas no configurador da loja foram desconsideradas.
             </div>
         </div>
         '''

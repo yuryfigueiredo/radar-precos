@@ -165,35 +165,65 @@ async def run_radar():
     pcs_12gb = sorted([p for p in all_pcs if p.get('vram') == '12GB'], key=lambda x: x['price'])
     pcs_16gb = sorted([p for p in all_pcs if p.get('vram') == '16GB'], key=lambda x: x['price'])
 
-    # Ranking de Custo-Benefício para Servidores de IA (Exclusivo NVIDIA 12GB e 16GB)
-    ai_pcs = []
+    # Ranking de Custo-Benefício para Servidores de IA (Exclusivo NVIDIA 12GB e 16GB + OBRIGATÓRIO 32GB+ MONTADO)
+    logger.info("Filtrando e verificando compatibilidade de 32GB RAM montado de fábrica nos PCs de IA...")
+    ai_candidates = []
     seen_ai_links = set()
     for p in (pcs_12gb + pcs_16gb):
         link = p.get('link', '')
         if link in seen_ai_links:
             continue
         seen_ai_links.add(link)
+        ai_candidates.append(p)
+
+    # Executa verificação de todos os candidatos em paralelo
+    tasks = [asyncio.to_thread(enrich_ai_pc_details, p) for p in ai_candidates]
+    enriched_candidates = await asyncio.gather(*tasks)
+
+    ai_ranking = []
+    for p in enriched_candidates:
+        title = p.get('title', '')
+        base_price = float(p.get('price', 0))
         vram_num = 16 if p.get('vram') == '16GB' else 12
-        price = float(p.get('price', 0))
-        cost_per_gb = round(price / vram_num, 2)
-        gpu_name = extract_gpu_name(p['title'])
+        ram_info = p.get('ram_info') or {}
+        site_custom = ram_info.get('site_custom') or {}
+        
+        # 1. Verifica se já vem com 32GB/64GB nativos de fábrica
+        is_native_32gb = bool(re.search(r'\b(32|64)\s*GB\b', title.upper()) and not re.search(r'VRAM|RTX|GEFORCE|RADEON|RX', title.upper()))
+        # 2. Verifica se o configurador da loja permite alterar para 32GB
+        is_custom_32gb = site_custom.get('site_customization_available', False)
+
+        # Filtro restritivo: SOMENTE PCs que venham ou possam ser alterados para 32GB+ montados
+        if not (is_native_32gb or is_custom_32gb):
+            continue
+
+        if is_native_32gb:
+            final_price = base_price
+            custom_diff = 0.0
+            ram_status_tag = "32GB Nativo de Fábrica"
+        else:
+            final_price = site_custom.get('site_assembled_total', base_price)
+            custom_diff = site_custom.get('site_diff_price', 0.0)
+            ram_status_tag = f"+R$ {custom_diff:,.2f} ({site_custom.get('site_option_title', '')[:32]}...)"
+
+        cost_per_gb = round(final_price / vram_num, 2)
+        gpu_name = extract_gpu_name(title)
         ai_recommendation = get_ai_recommendation(gpu_name, vram_num)
-        ai_pcs.append({
+
+        ai_ranking.append({
             **p,
             'vram_num': vram_num,
             'cost_per_gb': cost_per_gb,
             'gpu_name': gpu_name,
-            'ai_recommendation': ai_recommendation
+            'ai_recommendation': ai_recommendation,
+            'final_price_32gb': final_price,
+            'custom_diff': custom_diff,
+            'is_native_32gb': is_native_32gb,
+            'ram_status_tag': ram_status_tag
         })
-    ai_ranking = sorted(ai_pcs, key=lambda x: (x['cost_per_gb'], x['price']))
 
-    # Enriquecimento assíncrono dos melhores PCs de IA com análise de upgrade de RAM para 32GB
-    if ai_ranking:
-        logger.info("Analisando especificações de placa-mãe e upgrade para 32GB nos melhores PCs de IA...")
-        ai_top = ai_ranking[:8]
-        tasks = [asyncio.to_thread(enrich_ai_pc_details, p) for p in ai_top]
-        enriched_top = await asyncio.gather(*tasks)
-        ai_ranking = enriched_top + ai_ranking[8:]
+    # Ordena pelo melhor custo-benefício de VRAM já considerando a máquina montada com 32GB!
+    ai_ranking = sorted(ai_ranking, key=lambda x: (x['cost_per_gb'], x['final_price_32gb']))
 
     ssds_512 = sorted([s for s in all_ssds if s.get('capacity') == '512GB'], key=lambda x: x['price'])
     ssds_1tb = sorted([s for s in all_ssds if s.get('capacity') == '1TB'], key=lambda x: x['price'])
@@ -205,18 +235,15 @@ async def run_radar():
     print("RESULTADOS DOS MENORES PRECOS ENCONTRADOS")
     print("=" * 60)
     
-    print("\n[RANKING CUSTO-BENEFICIO: SERVIDORES DE IA (NVIDIA 12GB / 16GB)]:")
-    for rank, p in enumerate(ai_ranking[:6], 1):
+    print("\n[RANKING CUSTO-BENEFICIO: SERVIDORES DE IA (NVIDIA 12GB / 16GB + 32GB RAM MONTADO)]:")
+    if not ai_ranking:
+        print("  Nenhum PC com 32GB montado encontrado.")
+    for rank, p in enumerate(ai_ranking[:8], 1):
         ram_info = p.get('ram_info') or {}
-        site_custom = ram_info.get('site_custom') or {}
-        est_tot = ram_info.get('est_total_32gb', p['price'])
-        print(f"  #{rank} [R$ {p['cost_per_gb']:.2f}/GB] {format_currency(p['price'])} - [{p['store']}] {p['gpu_name']} ({p['title'][:45]}...)")
-        print(f"     -> Placa: {ram_info.get('mobo', 'M-ATX')} ({ram_info.get('slots', 2)} slots) | RAM Padrão: {ram_info.get('ram_desc', '16GB')}")
-        if site_custom:
-            site_status = site_custom.get('site_status_label', 'Indisponível no site')
-            site_tot = site_custom.get('site_assembled_total', p['price'])
-            print(f"     -> Montado de Fábrica no Site: {site_status} (Total: {format_currency(site_tot)})")
-        print(f"     -> Upgrade Manual: {ram_info.get('status_label', 'N/D')} [Total Estimado: {format_currency(est_tot)}]")
+        final_price = p.get('final_price_32gb', p['price'])
+        print(f"  #{rank} [R$ {p['cost_per_gb']:.2f}/GB] Montado c/ 32GB: {format_currency(final_price)} (Base: {format_currency(p['price'])})")
+        print(f"     [{p['store']}] {p['gpu_name']} - {p['title'][:55]}...")
+        print(f"     -> Placa: {ram_info.get('mobo', 'M-ATX')} ({ram_info.get('slots', 2)} slots) | Status 32GB: {p.get('ram_status_tag')}")
         print(f"     -> Recomendação IA: {p['ai_recommendation']}")
 
     print("\n[PCs COM 12GB VRAM - EXCLUSIVO NVIDIA]:")
