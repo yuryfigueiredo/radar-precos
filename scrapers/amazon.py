@@ -10,7 +10,8 @@ class AmazonScraper:
     async def get_ssds(self) -> List[Dict[str, Any]]:
         """Busca SSDs de 512GB e 1TB na Amazon Brasil."""
         results = []
-        queries = ["ssd 512gb", "ssd 1tb"]
+        queries = ["ssd 480gb", "ssd 512gb", "ssd 1tb"]
+        seen_links = set()
         
         async with async_playwright() as p:
             browser = await p.chromium.launch(
@@ -25,18 +26,18 @@ class AmazonScraper:
             
             for q in queries:
                 try:
-                    url = f"https://www.amazon.com.br/s?k={q.replace(' ', '+')}&s=price-asc-rank"
+                    url = f"https://www.amazon.com.br/s?k={q.replace(' ', '+')}"
                     await page.goto(url, timeout=30000, wait_until="domcontentloaded")
                     await page.wait_for_timeout(2500)
                     
                     cards = page.locator('div[data-component-type="s-search-result"]')
                     count = await cards.count()
                     
-                    for i in range(min(count, 20)):
+                    for i in range(min(count, 35)):
                         card = cards.nth(i)
                         
-                        # Título (usa .first para evitar colisão caso haja múltiplos h2)
-                        title_el = card.locator('h2 a span, h2')
+                        # Título
+                        title_el = card.locator('h2 span, h2')
                         if await title_el.count() == 0:
                             continue
                         title = await title_el.first.inner_text()
@@ -45,8 +46,8 @@ class AmazonScraper:
                         if not cap:
                             continue
                             
-                        # Link
-                        link_el = card.locator('h2 a')
+                        # Link (o título no Amazon é envolvido pela tag <a> pai ou tem link com /dp/)
+                        link_el = card.locator('a:has(h2), a[href*="/dp/"], h2 a')
                         if await link_el.count() == 0:
                             continue
                         href = await link_el.first.get_attribute('href')
@@ -56,6 +57,9 @@ class AmazonScraper:
                             href = f"https://www.amazon.com.br{href}"
                         href = href.split('/ref=')[0] if '/ref=' in href else href
                         
+                        if href in seen_links:
+                            continue
+                            
                         # Preço
                         price_el = card.locator('.a-price .a-offscreen')
                         if await price_el.count() > 0:
@@ -71,6 +75,7 @@ class AmazonScraper:
                         if not price or not (80 <= price <= 1500):
                             continue
                             
+                        seen_links.add(href)
                         results.append({
                             'title': title,
                             'price': price,
@@ -81,7 +86,7 @@ class AmazonScraper:
                             'category': 'SSD'
                         })
                 except Exception as e:
-                    logger.error(f"[Amazon] Erro ao buscar {q}: {e}")
+                    logger.error(f"[Amazon SSD] Erro ao buscar {q}: {e}")
                     
             await browser.close()
             
@@ -113,10 +118,10 @@ class AmazonScraper:
                     cards = page.locator('div[data-component-type="s-search-result"]')
                     count = await cards.count()
                     
-                    for i in range(min(count, 30)):
+                    for i in range(min(count, 35)):
                         card = cards.nth(i)
                         
-                        title_el = card.locator('h2 a span, h2')
+                        title_el = card.locator('h2 span, h2')
                         if await title_el.count() == 0:
                             continue
                         title = await title_el.first.inner_text()
@@ -124,7 +129,7 @@ class AmazonScraper:
                         if not is_valid_ram_16gb_ddr4(title):
                             continue
                             
-                        link_el = card.locator('h2 a')
+                        link_el = card.locator('a:has(h2), a[href*="/dp/"], h2 a')
                         if await link_el.count() == 0:
                             continue
                         href = await link_el.first.get_attribute('href')
@@ -148,7 +153,7 @@ class AmazonScraper:
                             continue
                             
                         price = clean_price(m.group(1))
-                        if not price or not (100 <= price <= 1000):
+                        if not price or not (80 <= price <= 1000):
                             continue
                             
                         seen_links.add(href)

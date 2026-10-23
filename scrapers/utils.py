@@ -48,9 +48,9 @@ def classify_pc_vram(title: str, description: str = "") -> Optional[str]:
     if not re.search(r'\b(PC GAMER|COMPUTADOR|DESKTOP|CPU GAMER)\b', t):
         return None
 
-    # Se a GPU for explicitamente de 2GB, 4GB ou 6GB (ex: RX 550, RX 560, GTX 1650, GTX 1050, GTX 1060, GTX 1660), descarta
-    if re.search(r'\b(RX\s*550|RX\s*560|GTX\s*1650|GTX\s*1050|GTX\s*1060|GTX\s*1660|4\s*GB\s*DEDICADA|4\s*GB\s*VRAM|6\s*GB\s*VRAM)\b', t):
-        if not re.search(r'\b(RTX|RX\s*6600|RX\s*7600|RX\s*580|RX\s*570)\b', t):
+    # Se a GPU for explicitamente de 2GB, 4GB ou 6GB (ex: RX 550, RX 560, GTX 1650, GTX 1050, GTX 1060, GTX 1660, RTX 3050 6GB), descarta
+    if re.search(r'\b(RX\s*550|RX\s*560|GTX\s*1650|GTX\s*1050|GTX\s*1060|GTX\s*1660|RTX\s*3050\s*6\s*GB|RTX\s*2060\s*6\s*GB|4\s*GB\s*DEDICADA|4\s*GB\s*VRAM|6\s*GB\s*VRAM|6\s*GB\s*DEDICADA)\b', t):
+        if not re.search(r'\b(RTX\s*3060|RTX\s*40|RX\s*6600|RX\s*7600|RX\s*580|RX\s*570)\b', t):
             return None
 
     # 1. GPUs de 16GB VRAM
@@ -72,8 +72,10 @@ def classify_pc_vram(title: str, description: str = "") -> Optional[str]:
         return '12GB'
 
     # 3. GPUs de 8GB VRAM
-    # Modelos: RX 6600, RX 6600 XT, RX 6650 XT, RTX 4060 (exceto Ti 16GB), RTX 3060 8GB, RTX 3050, RX 7600 (exceto XT), RX 580, RX 590, RX 570, Arc A580, Arc A750
+    # Modelos: RX 6600, RX 6600 XT, RX 6650 XT, RTX 4060 (exceto Ti 16GB), RTX 3060 8GB, RTX 3050 (8GB), RX 7600 (exceto XT), RX 580, RX 590, RX 570, Arc A580, Arc A750
     if re.search(r'\b(RX\s*6600|RX\s*6600\s*XT|RX\s*6650\s*XT|RTX\s*4060(?!\s*TI\s*16)|RTX\s*3060\s*8\s*GB|RTX\s*3050|RX\s*7600(?!\s*XT)|RX\s*580|RX\s*590|RX\s*570|ARC\s*A580|ARC\s*A750)\b', t):
+        if re.search(r'\bRTX\s*3050\s*6\s*GB\b', t) or (re.search(r'\bRTX\s*3050\b', t) and re.search(r'\b6\s*GB\b', t)):
+            return None
         return '8GB'
     if re.search(r'\b8\s*GB\s*(?:VRAM|DEDICADA)\b', t):
         return '8GB'
@@ -89,15 +91,15 @@ def classify_ssd_capacity(title: str) -> Optional[str]:
         return None
     
     # Confirma que é SSD
-    if not re.search(r'\b(SSD|NVME|M\.2|SATA\s*III|PCIE)\b', t):
+    if not re.search(r'\b(SSD|NVME|M\.2|SATA|PCIE)\b', t):
         return None
     
-    # 1TB (inclui 960GB, 1000GB, 1TB, 1024GB)
-    if re.search(r'\b(1\s*TB|960\s*GB|1000\s*GB|1024\s*GB)\b', t):
+    # 1TB (inclui 960GB, 1000GB, 1TB, 1024GB, 960G, 1000G)
+    if re.search(r'\b(1\s*TB|960\s*G(?:B)?|1000\s*G(?:B)?|1024\s*G(?:B)?)\b', t):
         return '1TB'
         
-    # 512GB (inclui 480GB, 500GB, 512GB)
-    if re.search(r'\b(512\s*GB|500\s*GB|480\s*GB)\b', t):
+    # 512GB (inclui 480GB, 500GB, 512GB, 480G, 500G, 512G)
+    if re.search(r'\b(512\s*G(?:B)?|500\s*G(?:B)?|480\s*G(?:B)?)\b', t):
         return '512GB'
         
     return None

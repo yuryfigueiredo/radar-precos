@@ -27,9 +27,13 @@ class MercadoLivreScraper:
             for q in queries:
                 try:
                     url = f"https://lista.mercadolivre.com.br/informatica/armazenamento/discos-acessorios/ssds/{q}_OrderId_PRICE_ASC_NoIndex_True"
-                    await page.goto(url, timeout=25000, wait_until="domcontentloaded")
-                    await page.wait_for_timeout(3000)
+                    await page.goto(url, timeout=12000, wait_until="domcontentloaded")
+                    await page.wait_for_timeout(2000)
                     
+                    if "account-verification" in page.url:
+                        logger.warning(f"[Mercado Livre SSD] Bloqueado por WAF/account-verification para {q}")
+                        continue
+                        
                     cards = page.locator('li.ui-search-layout__item, .poly-card')
                     count = await cards.count()
                     
@@ -107,9 +111,13 @@ class MercadoLivreScraper:
             for q in queries:
                 try:
                     url = f"https://lista.mercadolivre.com.br/informatica/componentes-pc/memorias-ram/{q}_OrderId_PRICE_ASC_NoIndex_True"
-                    await page.goto(url, timeout=25000, wait_until="domcontentloaded")
-                    await page.wait_for_timeout(3000)
+                    await page.goto(url, timeout=12000, wait_until="domcontentloaded")
+                    await page.wait_for_timeout(2000)
                     
+                    if "account-verification" in page.url:
+                        logger.warning(f"[Mercado Livre RAM] Bloqueado por WAF/account-verification para {q}")
+                        continue
+                        
                     cards = page.locator('li.ui-search-layout__item, .poly-card')
                     count = await cards.count()
                     
