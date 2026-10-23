@@ -13,9 +13,12 @@ def clean_price(price_input: Any) -> Optional[float]:
     if not txt:
         return None
     
-    # Formato brasileiro: 1.299,90 -> 1299.90
+    # Suporta formato brasileiro (1.299,90) e internacional (1,299.90)
     if ',' in txt and '.' in txt:
-        txt = txt.replace('.', '').replace(',', '.')
+        if txt.rfind(',') > txt.rfind('.'):
+            txt = txt.replace('.', '').replace(',', '.')
+        else:
+            txt = txt.replace(',', '')
     elif ',' in txt:
         txt = txt.replace(',', '.')
     
