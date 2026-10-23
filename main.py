@@ -25,7 +25,8 @@ from scrapers import (
     format_currency,
     extract_gpu_name,
     get_ai_recommendation,
-    analyze_pc_ram_upgrade
+    analyze_pc_ram_upgrade,
+    check_pichau_bundle_32gb_options
 )
 from notifier import send_email_alert
 
@@ -37,7 +38,7 @@ logging.basicConfig(
 logger = logging.getLogger("RadarHardware")
 
 def enrich_ai_pc_details(item: Dict[str, Any]) -> Dict[str, Any]:
-    """Enriquece informações de placa-mãe e slots buscando detalhes da página do produto."""
+    """Enriquece informações de placa-mãe, slots e verifica se o configurador da loja permite vir montado com 32GB."""
     import re
     url = item.get('link', '')
     title = item.get('title', '')
@@ -75,6 +76,12 @@ def enrich_ai_pc_details(item: Dict[str, Any]) -> Dict[str, Any]:
             pass
 
     ram_info = analyze_pc_ram_upgrade(title, desc_detail, price)
+    
+    # Consulta se o configurador da loja permite vir montado de fábrica com 32GB
+    if url and item.get('store') == 'Pichau':
+        site_custom = check_pichau_bundle_32gb_options(url, price)
+        ram_info['site_custom'] = site_custom
+
     item['ram_info'] = ram_info
     return item
 
@@ -201,10 +208,15 @@ async def run_radar():
     print("\n[RANKING CUSTO-BENEFICIO: SERVIDORES DE IA (NVIDIA 12GB / 16GB)]:")
     for rank, p in enumerate(ai_ranking[:6], 1):
         ram_info = p.get('ram_info') or {}
+        site_custom = ram_info.get('site_custom') or {}
         est_tot = ram_info.get('est_total_32gb', p['price'])
         print(f"  #{rank} [R$ {p['cost_per_gb']:.2f}/GB] {format_currency(p['price'])} - [{p['store']}] {p['gpu_name']} ({p['title'][:45]}...)")
         print(f"     -> Placa: {ram_info.get('mobo', 'M-ATX')} ({ram_info.get('slots', 2)} slots) | RAM Padrão: {ram_info.get('ram_desc', '16GB')}")
-        print(f"     -> Upgrade 32GB: {ram_info.get('status_label', 'N/D')} [Total Estimado: {format_currency(est_tot)}]")
+        if site_custom:
+            site_status = site_custom.get('site_status_label', 'Indisponível no site')
+            site_tot = site_custom.get('site_assembled_total', p['price'])
+            print(f"     -> Montado de Fábrica no Site: {site_status} (Total: {format_currency(site_tot)})")
+        print(f"     -> Upgrade Manual: {ram_info.get('status_label', 'N/D')} [Total Estimado: {format_currency(est_tot)}]")
         print(f"     -> Recomendação IA: {p['ai_recommendation']}")
 
     print("\n[PCs COM 12GB VRAM - EXCLUSIVO NVIDIA]:")

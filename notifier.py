@@ -97,6 +97,7 @@ def generate_html_report(data: Dict[str, Any]) -> str:
 
             # Dados de Upgrade de RAM para 32GB
             ram_info = item.get('ram_info') or {}
+            site_custom = ram_info.get('site_custom') or {}
             mobo = ram_info.get('mobo', 'M-ATX')
             slots = ram_info.get('slots', 2)
             ram_desc = ram_info.get('ram_desc', '16GB')
@@ -106,6 +107,46 @@ def generate_html_report(data: Dict[str, Any]) -> str:
             extra_cost = ram_info.get('extra_cost', 600.0)
             est_total_32gb = ram_info.get('est_total_32gb', item.get('price', 0) + extra_cost)
             est_total_str = f"R$ {est_total_32gb:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+            # Bloco de disponibilidade no configurador da loja (Vir montado)
+            if site_custom:
+                site_label = site_custom.get('site_status_label', 'Indisponível no site')
+                site_bg = site_custom.get('site_badge_bg', '#fee2e2')
+                site_color = site_custom.get('site_badge_color', '#991b1b')
+                site_avail = site_custom.get('site_customization_available', False)
+                site_total = site_custom.get('site_assembled_total', item.get('price', 0))
+                site_total_str = f"R$ {site_total:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+                
+                if site_avail:
+                    site_html = f'''
+                    <div style="margin-bottom: 4px;">
+                        <span style="background-color: {site_bg}; color: {site_color}; font-weight: 800; font-size: 10px; padding: 2px 6px; border-radius: 4px; display: inline-block;">
+                            {site_label}
+                        </span>
+                        <div style="font-size: 11px; color: #15803d; font-weight: 700; margin-top: 2px;">
+                            Total Montado: ~{site_total_str}
+                        </div>
+                    </div>
+                    '''
+                else:
+                    site_html = f'''
+                    <div style="margin-bottom: 4px;">
+                        <span style="background-color: {site_bg}; color: {site_color}; font-weight: 800; font-size: 10px; padding: 2px 6px; border-radius: 4px; display: inline-block;">
+                            {site_label}
+                        </span>
+                        <div style="font-size: 10px; color: #991b1b; margin-top: 2px;">
+                            Não é possível comprar já montado
+                        </div>
+                    </div>
+                    '''
+            else:
+                site_html = f'''
+                <div style="margin-bottom: 4px;">
+                    <span style="background-color: #f1f5f9; color: #475569; font-weight: 700; font-size: 10px; padding: 2px 6px; border-radius: 4px; display: inline-block;">
+                        ⚪ Consultar loja
+                    </span>
+                </div>
+                '''
 
             rows_html += f'''
             <tr style="background-color: {row_bg}; border-bottom: 1px solid #e2e8f0;">
@@ -134,14 +175,14 @@ def generate_html_report(data: Dict[str, Any]) -> str:
                     {clean_price_val}
                 </td>
                 <td style="padding: 12px 10px; font-size: 11px; vertical-align: middle; white-space: nowrap;">
-                    <span style="background-color: {badge_bg}; color: {badge_color}; font-weight: 800; font-size: 11px; padding: 3px 7px; border-radius: 4px; display: inline-block; margin-bottom: 3px;">
-                        {status_label}
-                    </span>
-                    <div style="font-size: 11px; color: #475569; margin-top: 2px;">
-                        Placa: <b>{mobo}</b> ({slots} slots) • Padrão: <b>{ram_desc}</b>
-                    </div>
-                    <div style="font-size: 11px; color: #047857; font-weight: 700; margin-top: 3px;">
-                        Total c/ 32GB: ~{est_total_str}
+                    {site_html}
+                    <div style="border-top: 1px dashed #cbd5e1; padding-top: 4px; margin-top: 4px;">
+                        <div style="font-size: 10px; color: #64748b;">
+                            Placa: <b>{mobo}</b> ({slots} slots) • Padrão: <b>{ram_desc}</b>
+                        </div>
+                        <div style="font-size: 11px; color: #047857; font-weight: 700; margin-top: 1px;">
+                            Manual: ~{est_total_str} ({status_label})
+                        </div>
                     </div>
                 </td>
                 <td style="padding: 12px 12px; font-size: 11px; color: #334155; line-height: 1.4; vertical-align: middle; max-width: 190px;">

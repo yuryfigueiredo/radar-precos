@@ -3,7 +3,13 @@ from .terabyte import TerabyteScraper
 from .pichau import PichauScraper
 from .amazon import AmazonScraper
 from .mercadolivre import MercadoLivreScraper
-from .utils import format_currency, extract_gpu_name, get_ai_recommendation, analyze_pc_ram_upgrade
+from .utils import (
+    format_currency,
+    extract_gpu_name,
+    get_ai_recommendation,
+    analyze_pc_ram_upgrade,
+    check_pichau_bundle_32gb_options
+)
 
 __all__ = [
     'KabumScraper',
@@ -14,5 +20,6 @@ __all__ = [
     'format_currency',
     'extract_gpu_name',
     'get_ai_recommendation',
-    'analyze_pc_ram_upgrade'
+    'analyze_pc_ram_upgrade',
+    'check_pichau_bundle_32gb_options'
 ]

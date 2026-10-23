@@ -274,3 +274,97 @@ def analyze_pc_ram_upgrade(title: str, text: str = "", price: float = 0.0) -> Di
         "tip": tip
     }
 
+PICHAU_BUNDLE_ACTION_ID = "40e1f10c68f20d04d69cbb2e64d0054d74cadb1911"
+
+def check_pichau_bundle_32gb_options(url: str, base_price: float = 0.0) -> Dict[str, Any]:
+    """
+    Consulta o configurador Server Action da Pichau para verificar se há opção de 32GB
+    em estoque para vir montado direto de fábrica.
+    """
+    import json
+    from curl_cffi import requests as cffi_requests
+    
+    res = {
+        "site_customization_available": False,
+        "site_option_title": "",
+        "site_diff_price": 0.0,
+        "site_assembled_total": base_price,
+        "site_status_label": "Indisponível no site",
+        "site_badge_bg": "#fee2e2",
+        "site_badge_color": "#991b1b"
+    }
+    
+    try:
+        session = cffi_requests.Session(impersonate="chrome124")
+        get_headers = {
+            "Accept-Language": "pt-BR,pt;q=0.9",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        }
+        r_get = session.get(url, headers=get_headers, timeout=12)
+        if r_get.status_code != 200:
+            return res
+            
+        m_sku = re.search(r'\b(PCM-[A-Za-z0-9_-]+)\b', r_get.text)
+        if not m_sku:
+            return res
+        sku = m_sku.group(1)
+        
+        post_headers = {
+            "Accept-Language": "pt-BR,pt;q=0.9",
+            "Next-Action": PICHAU_BUNDLE_ACTION_ID,
+            "Accept": "text/x-component",
+            "Content-Type": "text/plain;charset=UTF-8",
+            "Origin": "https://www.pichau.com.br",
+            "Referer": url,
+            "sec-fetch-dest": "empty",
+            "sec-fetch-mode": "cors",
+            "sec-fetch-site": "same-origin"
+        }
+        r_post = session.post(url, headers=post_headers, data=json.dumps([sku]), timeout=12)
+        if r_post.status_code == 200:
+            for line in r_post.text.split("\n"):
+                if line.startswith("1:"):
+                    data = json.loads(line[2:])
+                    for opt in data.get("options", []):
+                        if opt.get("title") == "Memória":
+                            def_item = next((v for v in opt.get("value", []) if v.get("is_default")), None)
+                            def_price = float(def_item.get("price", 0)) if def_item else 0.0
+                            
+                            in_stock_32gb = []
+                            all_32gb = []
+                            for val in opt.get("value", []):
+                                val_title = val.get("title") or val.get("product", {}).get("name", "")
+                                val_stock = val.get("product", {}).get("stock_status")
+                                val_price = float(val.get("price", 0))
+                                
+                                if "32GB" in val_title.upper() or "32 GB" in val_title.upper():
+                                    diff = val_price - def_price
+                                    item_data = {"title": val_title, "stock": val_stock, "diff": diff}
+                                    all_32gb.append(item_data)
+                                    if val_stock == "IN_STOCK":
+                                        in_stock_32gb.append(item_data)
+                                        
+                            if in_stock_32gb:
+                                best = in_stock_32gb[0]
+                                diff_val = round(best["diff"], 2)
+                                res["site_customization_available"] = True
+                                res["site_option_title"] = best["title"]
+                                res["site_diff_price"] = diff_val
+                                res["site_assembled_total"] = round(base_price + diff_val, 2)
+                                res["site_status_label"] = f"🟢 Disponível no Site (+R$ {diff_val:,.2f})"
+                                res["site_badge_bg"] = "#dcfce7"
+                                res["site_badge_color"] = "#15803d"
+                            elif all_32gb:
+                                res["site_status_label"] = "🔴 32GB Esgotado no Site"
+                                res["site_badge_bg"] = "#fee2e2"
+                                res["site_badge_color"] = "#991b1b"
+                            else:
+                                res["site_status_label"] = "⚪ Sem opção 32GB no site"
+                                res["site_badge_bg"] = "#f1f5f9"
+                                res["site_badge_color"] = "#475569"
+    except Exception:
+        pass
+        
+    return res
+
+
