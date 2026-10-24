@@ -1,5 +1,6 @@
 import os
 import sys
+import re
 import asyncio
 import logging
 from typing import Dict, List, Any
@@ -39,7 +40,6 @@ logger = logging.getLogger("RadarHardware")
 
 def enrich_ai_pc_details(item: Dict[str, Any]) -> Dict[str, Any]:
     """Enriquece informações de placa-mãe, slots e verifica se o configurador da loja permite vir montado com 32GB."""
-    import re
     url = item.get('link', '')
     title = item.get('title', '')
     price = float(item.get('price', 0))
