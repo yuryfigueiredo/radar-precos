@@ -274,7 +274,7 @@ def analyze_pc_ram_upgrade(title: str, text: str = "", price: float = 0.0) -> Di
         "tip": tip
     }
 
-PICHAU_BUNDLE_ACTION_ID = "40e1f10c68f20d04d69cbb2e64d0054d74cadb1911"
+PICHAU_BUNDLE_ACTION_ID = "40d8fb501dafbbc2a3dc281d952ec724da3deffb4f"
 
 def check_pichau_bundle_32gb_options(url: str, base_price: float = 0.0) -> Dict[str, Any]:
     """
