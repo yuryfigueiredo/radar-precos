@@ -8,7 +8,10 @@ from .utils import (
     extract_gpu_name,
     get_ai_recommendation,
     analyze_pc_ram_upgrade,
-    check_pichau_bundle_32gb_options
+    check_pichau_bundle_32gb_options,
+    is_top_brand_ram,
+    is_preferred_nvme_model,
+    is_nvme_ssd
 )
 
 __all__ = [
@@ -21,5 +24,8 @@ __all__ = [
     'extract_gpu_name',
     'get_ai_recommendation',
     'analyze_pc_ram_upgrade',
-    'check_pichau_bundle_32gb_options'
+    'check_pichau_bundle_32gb_options',
+    'is_top_brand_ram',
+    'is_preferred_nvme_model',
+    'is_nvme_ssd'
 ]

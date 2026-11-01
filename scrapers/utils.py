@@ -139,6 +139,10 @@ def classify_ssd_capacity(title: str) -> Optional[str]:
     if not re.search(r'\b(SSD|NVME|M\.2)\b', t):
         return None
     
+    # 2TB (inclui 2TB, 2000GB, 2048GB, 2000G, 2TB)
+    if re.search(r'\b(2\s*TB|2000\s*G(?:B)?|2048\s*G(?:B)?)\b', t):
+        return '2TB'
+
     # 1TB (inclui 960GB, 1000GB, 1TB, 1024GB, 960G, 1000G)
     if re.search(r'\b(1\s*TB|960\s*G(?:B)?|1000\s*G(?:B)?|1024\s*G(?:B)?)\b', t):
         return '1TB'
@@ -148,6 +152,41 @@ def classify_ssd_capacity(title: str) -> Optional[str]:
         return '512GB'
         
     return None
+
+def is_nvme_ssd(title: str) -> bool:
+    """Verifica se o SSD é do tipo NVMe / M.2 PCIe."""
+    t = title.upper()
+    return bool(re.search(r'\b(NVME|PCIE|GEN[345]|M\.2|M2|SN580|NV3|NV2|P3|P3\s*PLUS|NM620|NM790|LEGEND|REAPER|GAMMIX|FURY\s*RENEGADE)\b', t))
+
+def is_preferred_nvme_model(title: str) -> bool:
+    """Verifica se é um modelo NVMe de destaque custo-benefício (Kingston NV3, WD Blue SN580, Crucial P3 Plus)."""
+    t = title.upper()
+    if re.search(r'\b(NV3|NV2)\b', t) or re.search(r'\bKINGSTON\s+NV3\b', t):
+        return True
+    if re.search(r'\b(SN580|SN570)\b', t) or re.search(r'\bWD\s+(?:BLUE\s+)?SN580\b', t):
+        return True
+    if re.search(r'\b(P3\s*PLUS|P3)\b', t) or re.search(r'\bCRUCIAL\s+P3\b', t):
+        return True
+    return False
+
+def is_top_brand_ram(title: str) -> bool:
+    """
+    Identifica as marcas e linhas de memórias preferidas do usuário:
+    - Kingston Fury Beast
+    - XPG Gammix D35
+    - Corsair Vengeance LPX
+    - Crucial / Crucial Ballistix / Crucial Pro
+    """
+    t = title.upper()
+    if re.search(r'\b(FURY|BEAST)\b', t) or (re.search(r'\bKINGSTON\b', t) and re.search(r'\b(FURY|BEAST|RENEGADE)\b', t)):
+        return True
+    if re.search(r'\b(GAMMIX\s*D35|GAMMIX\s*D10|GAMMIX|D35)\b', t) or (re.search(r'\bXPG\b', t) and re.search(r'\b(D35|GAMMIX|SPECTRIX)\b', t)):
+        return True
+    if re.search(r'\b(VENGEANCE|LPX)\b', t) or (re.search(r'\bCORSAIR\b', t) and re.search(r'\b(VENGEANCE|LPX)\b', t)):
+        return True
+    if re.search(r'\bCRUCIAL\b', t):
+        return True
+    return False
 
 def is_valid_ram_16gb_ddr4(title: str) -> bool:
     """
@@ -168,7 +207,9 @@ def is_valid_ram_16gb_ddr4(title: str) -> bool:
     if not re.search(r'\b(DDR4|DDR-4)\b', t):
         return False
         
-    # 4. Rejeita acessórios avulsos (dissipadores avulsos, coolers, cabos)
+    # 4. Rejeita placas-mãe, processadores, kits upgrade ou acessórios avulsos
+    if re.search(r'\b(PLACA\s*M[ÃA]E|MOTHERBOARD|MAINBOARD|PROCESSADOR|RYZEN|INTEL\s+CORE|KIT\s+UPGRADE|FONTE|GABINETE)\b', t):
+        return False
     if re.search(r'^(DISSIPADOR|COOLER|CABO|ADAPTADOR|GAVETA|CASE)\b', t) or re.search(r'\b(DISSIPADOR\s+PARA|COOLER\s+PARA)\b', t):
         return False
         

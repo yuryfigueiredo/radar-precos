@@ -86,9 +86,9 @@ class TerabyteScraper:
         return results
 
     def get_ssds(self) -> List[Dict[str, Any]]:
-        """Busca SSDs de 512GB e 1TB na Terabyte."""
+        """Busca SSDs de 512GB, 1TB e 2TB na Terabyte."""
         results = []
-        queries = ["ssd 512gb", "ssd 1tb"]
+        queries = ["ssd 512gb", "ssd 1tb", "ssd 2tb", "ssd nvme 1tb", "ssd nvme 2tb", "kingston nv3", "wd sn580", "crucial p3"]
         seen_links = set()
 
         for q in queries:
@@ -103,7 +103,7 @@ class TerabyteScraper:
                             continue
                         seen_links.add(p['link'])
                         cap = classify_ssd_capacity(p['title'])
-                        if cap and 80 <= p['price'] <= 1500:
+                        if cap and 80 <= p['price'] <= 3000:
                             p['capacity'] = cap
                             p['category'] = 'SSD'
                             results.append(p)
@@ -112,9 +112,16 @@ class TerabyteScraper:
         return results
 
     def get_ram_16gb_ddr4(self) -> List[Dict[str, Any]]:
-        """Busca memórias RAM 16GB DDR4 na TerabyteShop."""
+        """Busca memórias RAM 16GB DDR4 na TerabyteShop (incluindo marcas preferidas)."""
         results = []
-        queries = ["memoria ddr4 16gb", "memoria ram ddr4 16gb"]
+        queries = [
+            "memoria ddr4 16gb",
+            "memoria ram ddr4 16gb",
+            "fury beast 16gb ddr4",
+            "xpg gammix d35 16gb",
+            "corsair vengeance 16gb ddr4",
+            "crucial 16gb ddr4"
+        ]
         seen_links = set()
 
         for q in queries:
@@ -128,7 +135,7 @@ class TerabyteScraper:
                         if p['link'] in seen_links:
                             continue
                         seen_links.add(p['link'])
-                        if is_valid_ram_16gb_ddr4(p['title']) and 100 <= p['price'] <= 1000:
+                        if is_valid_ram_16gb_ddr4(p['title']) and 100 <= p['price'] <= 1800:
                             p['category'] = 'RAM'
                             results.append(p)
             except Exception as e:

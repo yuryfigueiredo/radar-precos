@@ -188,7 +188,7 @@ class PichauScraper:
         return results
 
     # -------------------------------------------------------------
-    # 2. SSDs (512GB e 1TB)
+    # 2. SSDs (512GB, 1TB e 2TB)
     # -------------------------------------------------------------
     def _fetch_ssds_sync(self) -> List[Dict[str, Any]]:
         results = []
@@ -197,6 +197,10 @@ class PichauScraper:
             "https://www.pichau.com.br/hardware/ssd?sort=price-asc",
             "https://www.pichau.com.br/search?q=ssd+512gb",
             "https://www.pichau.com.br/search?q=ssd+1tb",
+            "https://www.pichau.com.br/search?q=ssd+2tb",
+            "https://www.pichau.com.br/search?q=kingston+nv3",
+            "https://www.pichau.com.br/search?q=wd+sn580",
+            "https://www.pichau.com.br/search?q=crucial+p3",
         ]
         s = self._get_session()
         for url in urls:
@@ -238,10 +242,10 @@ class PichauScraper:
                             price = clean_price(m_pix.group(1))
                     if not price:
                         prices_found = [clean_price(p) for p in re.findall(r'R\$\s*([\d\.,]+)', raw_text) if clean_price(p)]
-                        valid_prices = [p for p in prices_found if 80 <= p <= 1500]
+                        valid_prices = [p for p in prices_found if 80 <= p <= 3000]
                         if valid_prices:
                             price = min(valid_prices)
-                    if not price or not (80 <= price <= 1500):
+                    if not price or not (80 <= price <= 3000):
                         continue
                     seen_links.add(href)
                     results.append({
@@ -267,7 +271,12 @@ class PichauScraper:
         results = []
         seen_links = set()
         urls = [
+            "https://www.pichau.com.br/memoria-mancer-dantalion-16gb-1x16gb-ddr4-3200mhz-cl19-preta-e-branca-mcr-dtl3200-16gb",
             "https://www.pichau.com.br/search?q=memoria+ddr4+16gb&sort=price-asc",
+            "https://www.pichau.com.br/search?q=fury+beast+16gb+ddr4",
+            "https://www.pichau.com.br/search?q=gammix+d35+16gb",
+            "https://www.pichau.com.br/search?q=corsair+vengeance+16gb+ddr4",
+            "https://www.pichau.com.br/search?q=crucial+16gb+ddr4",
             "https://www.pichau.com.br/hardware/memorias?capacidade=5645",
             "https://www.pichau.com.br/hardware/memorias",
         ]
@@ -278,6 +287,31 @@ class PichauScraper:
                 if resp.status_code != 200:
                     continue
                 soup = BeautifulSoup(resp.text, "html.parser")
+                
+                # Se for a página individual do produto (ex: Mancer Dantalion)
+                if "/memoria-mancer-dantalion-" in url:
+                    title_el = soup.find("h1")
+                    title = title_el.get_text().strip() if title_el else "Memoria Mancer Dantalion, 16GB (1x16GB), DDR4, 3200MHz, CL19, Preta e Branca, MCR-DTL3200-16GB"
+                    price = None
+                    price_vista_el = soup.select_one('div[class*="price_vista"]')
+                    if price_vista_el:
+                        price = clean_price(price_vista_el.get_text())
+                    if not price:
+                        m_pix = re.search(r'R\$\s*([\d\.,]+)', resp.text)
+                        if m_pix:
+                            price = clean_price(m_pix.group(1))
+                    if price and 100 <= price <= 1800:
+                        seen_links.add(url)
+                        results.append({
+                            'title': title,
+                            'price': price,
+                            'store': 'Pichau',
+                            'warranty': 'Garantia Pichau',
+                            'link': url,
+                            'category': 'RAM'
+                        })
+                    continue
+
                 cards = soup.select('a[href*="/memoria-"], a[data-cy*="product"]')
                 for card in cards:
                     href = card.get('href')
@@ -310,10 +344,10 @@ class PichauScraper:
                             price = clean_price(m_pix.group(1))
                     if not price:
                         prices_found = [clean_price(p) for p in re.findall(r'R\$\s*([\d\.,]+)', raw_text) if clean_price(p)]
-                        valid = [p for p in prices_found if 80 <= p <= 1000]
+                        valid = [p for p in prices_found if 80 <= p <= 1800]
                         if valid:
                             price = min(valid)
-                    if not price or not (80 <= price <= 1000):
+                    if not price or not (80 <= price <= 1800):
                         continue
                     seen_links.add(href)
                     results.append({

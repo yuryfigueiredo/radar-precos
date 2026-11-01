@@ -8,9 +8,9 @@ logger = logging.getLogger(__name__)
 
 class MercadoLivreScraper:
     async def get_ssds(self) -> List[Dict[str, Any]]:
-        """Busca SSDs de 512GB e 1TB no Mercado Livre."""
+        """Busca SSDs de 512GB, 1TB e 2TB no Mercado Livre."""
         results = []
-        queries = ["ssd-512gb", "ssd-1tb"]
+        queries = ["ssd-512gb", "ssd-1tb", "ssd-2tb", "ssd-nvme-1tb", "kingston-nv3"]
         
         async with async_playwright() as p:
             browser = await p.chromium.launch(

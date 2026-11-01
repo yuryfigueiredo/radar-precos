@@ -8,9 +8,9 @@ logger = logging.getLogger(__name__)
 
 class AmazonScraper:
     async def get_ssds(self) -> List[Dict[str, Any]]:
-        """Busca SSDs de 512GB e 1TB na Amazon Brasil."""
+        """Busca SSDs de 512GB, 1TB e 2TB na Amazon Brasil."""
         results = []
-        queries = ["ssd 480gb", "ssd 512gb", "ssd 1tb"]
+        queries = ["ssd 480gb", "ssd 512gb", "ssd 1tb", "ssd 2tb", "kingston nv3", "wd sn580", "crucial p3 plus"]
         seen_links = set()
         
         async with async_playwright() as p:
@@ -93,9 +93,16 @@ class AmazonScraper:
         return results
 
     async def get_ram_16gb_ddr4(self) -> List[Dict[str, Any]]:
-        """Busca memórias RAM 16GB DDR4 mais baratas na Amazon Brasil."""
+        """Busca memórias RAM 16GB DDR4 na Amazon Brasil (incluindo marcas preferidas)."""
         results = []
-        queries = ["memoria ddr4 16gb", "memoria ram ddr4 16gb"]
+        queries = [
+            "memoria ddr4 16gb",
+            "memoria ram ddr4 16gb",
+            "kingston fury beast 16gb ddr4",
+            "xpg gammix d35 16gb",
+            "corsair vengeance lpx 16gb ddr4",
+            "crucial 16gb ddr4"
+        ]
         seen_links = set()
         
         async with async_playwright() as p:

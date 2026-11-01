@@ -275,21 +275,24 @@ def generate_html_report(data: Dict[str, Any]) -> str:
         return table_html
 
     ai_ranking = data.get('ai_ranking', [])
-    pcs_8gb = data.get('pcs_8gb', [])
-    pcs_12gb = data.get('pcs_12gb', [])
-    pcs_16gb = data.get('pcs_16gb', [])
+    mancer_dantalion = data.get('mancer_dantalion', [])
+    top_brand_rams = data.get('top_brand_rams', [])
+    cheapest_rams = data.get('cheapest_rams', [])
     rams_16gb = data.get('rams_16gb', [])
-    ssds_512 = data.get('ssds_512', [])
+    nvme_top_1tb = data.get('nvme_top_1tb', [])
+    nvme_top_2tb = data.get('nvme_top_2tb', [])
+    nvme_general_1tb = data.get('nvme_general_1tb', [])
+    nvme_general_2tb = data.get('nvme_general_2tb', [])
     ssds_1tb = data.get('ssds_1tb', [])
+    ssds_2tb = data.get('ssds_2tb', [])
+    ssds_512 = data.get('ssds_512', [])
 
     # Destaques para a Análise de Mercado
     best_ai = ai_ranking[0] if ai_ranking else None
-    best_pc_12gb = pcs_12gb[0] if pcs_12gb else None
-    best_pc_8gb = pcs_8gb[0] if pcs_8gb else None
-    best_pc_16gb = pcs_16gb[0] if pcs_16gb else None
-    best_ram = rams_16gb[0] if rams_16gb else None
-    best_ssd_512 = ssds_512[0] if ssds_512 else None
-    best_ssd_1tb = ssds_1tb[0] if ssds_1tb else None
+    best_top_ram = top_brand_rams[0] if top_brand_rams else (rams_16gb[0] if rams_16gb else None)
+    best_nvme_1tb = nvme_top_1tb[0] if nvme_top_1tb else (ssds_1tb[0] if ssds_1tb else None)
+    best_nvme_2tb = nvme_top_2tb[0] if nvme_top_2tb else (ssds_2tb[0] if ssds_2tb else None)
+    best_dantalion = mancer_dantalion[0] if mancer_dantalion else None
 
     html_content = f'''<!DOCTYPE html>
 <html>
@@ -336,93 +339,115 @@ def generate_html_report(data: Dict[str, Any]) -> str:
             
             <div style="margin-top: 22px;">
                 <h1 style="margin: 0; font-size: 22px; font-weight: 700; color: #0e2a47;">
-                    RELATÓRIO DIÁRIO DE PREÇOS - Hardware & Servidores de IA
+                    RELATÓRIO DIÁRIO DE PREÇOS - Hardware, Servidores IA & Peças
                 </h1>
                 <p style="margin: 6px 0 0 0; font-size: 14px; color: #475569;">
                     Olá, <strong>Yury</strong>,
                 </p>
                 <p style="margin: 4px 0 0 0; font-size: 13px; color: #64748b; line-height: 1.5;">
-                    Abaixo está o consolidado com o <strong>Ranking Exclusivo para Servidor de IA (NVIDIA CUDA 12GB/16GB)</strong> e os menores preços encontrados nas maiores lojas do Brasil (Pichau, Kabum, Terabyte e Amazon).
+                    Abaixo está o radar completo focado em <strong>PCs montados com 32GB de RAM</strong> e a seleção especializada de <strong>Memórias DDR4 (Mancer Dantalion, Kingston Fury, XPG D35, Corsair, Crucial)</strong> e <strong>SSDs NVMe Custo-Benefício (Kingston NV3, WD Blue SN580, Crucial P3 Plus)</strong>.
                 </p>
             </div>
         </div>
 
         <div style="padding: 25px 30px;">
             
-            <!-- SEÇÃO DESTAQUE: RANKING SERVIDOR DE IA (NVIDIA CUDA) -->
+            <!-- SEÇÃO DESTAQUE 1: RANKING SERVIDOR DE IA (NVIDIA CUDA + 32GB MONTADOS) -->
             {render_ai_ranking_table(ai_ranking, max_items=6)}
 
-            <!-- SEÇÃO 1: PCs 12GB VRAM (Exclusivo NVIDIA) -->
+            <!-- SEÇÃO DESTAQUE FIXO: MEMÓRIA MANCER DANTALION 16GB 3200MHz -->
+            {f'''
             <div style="margin-bottom: 25px;">
                 <div style="display: flex; align-items: center; margin-bottom: 10px;">
                     <h2 style="margin: 0; font-size: 16px; font-weight: 700; color: #0e2a47;">
-                        🚀 Computadores p/ IA & Games — Placa de Vídeo de 12GB VRAM (Exclusivo NVIDIA)
+                        ⭐ Memória Destaque Fixo — Mancer Dantalion 16GB DDR4 3200MHz CL19
                     </h2>
                 </div>
-                {render_category_table(pcs_12gb, "NVIDIA 12GB", max_items=8)}
+                {render_category_table(mancer_dantalion, "RAM Dantalion", max_items=2)}
             </div>
+            ''' if mancer_dantalion else ''}
 
-            <!-- SEÇÃO 2: PCs 16GB VRAM (Exclusivo NVIDIA) -->
+            <!-- SEÇÃO 2: Memórias RAM 16GB DDR4 — Marcas Selecionadas (Kingston Fury, XPG D35, Corsair, Crucial) -->
             <div style="margin-bottom: 25px;">
                 <div style="display: flex; align-items: center; margin-bottom: 10px;">
                     <h2 style="margin: 0; font-size: 16px; font-weight: 700; color: #0e2a47;">
-                        ⚡ Computadores p/ IA & Games — Placa de Vídeo de 16GB VRAM (Exclusivo NVIDIA)
+                        🏆 Memórias RAM 16GB DDR4 — Marcas Recomendadas (Kingston Fury Beast, XPG D35, Corsair LPX, Crucial)
                     </h2>
                 </div>
-                {render_category_table(pcs_16gb, "NVIDIA 16GB", max_items=8)}
+                {render_category_table(top_brand_rams, "RAM Top Brand", max_items=8)}
             </div>
 
-            <!-- SEÇÃO 3: PCs 8GB VRAM (NVIDIA e AMD) -->
+            <!-- SEÇÃO 3: Memórias RAM 16GB DDR4 — Mais Baratas Gerais -->
             <div style="margin-bottom: 25px;">
                 <div style="display: flex; align-items: center; margin-bottom: 10px;">
                     <h2 style="margin: 0; font-size: 16px; font-weight: 700; color: #0e2a47;">
-                        🎮 Computadores de Entrada — Placa de Vídeo de 8GB VRAM (NVIDIA e AMD)
+                        🧠 Memórias RAM 16GB DDR4 Gamer (Mais Baratas Gerais)
                     </h2>
                 </div>
-                {render_category_table(pcs_8gb, "PC 8GB (NV/AMD)", max_items=8)}
+                {render_category_table(cheapest_rams, "RAM 16GB DDR4", max_items=8)}
             </div>
 
-            <!-- SEÇÃO 4: Memórias RAM 16GB DDR4 -->
+            <!-- SEÇÃO 4: NVMe 1TB Custo-Benefício Destaque (Kingston NV3, WD SN580, Crucial P3 Plus) -->
             <div style="margin-bottom: 25px;">
                 <div style="display: flex; align-items: center; margin-bottom: 10px;">
                     <h2 style="margin: 0; font-size: 16px; font-weight: 700; color: #0e2a47;">
-                        🧠 Memórias RAM 16GB DDR4 Gamer (Mais Baratas de Cada Loja)
+                        ⚡ SSDs NVMe 1TB — Melhores Custo-Benefício (Kingston NV3, WD Blue SN580, Crucial P3 Plus)
                     </h2>
                 </div>
-                {render_category_table(rams_16gb, "RAM 16GB DDR4", max_items=10)}
+                {render_category_table(nvme_top_1tb, "NVMe 1TB Top", max_items=8)}
             </div>
 
-            <!-- SEÇÃO 5: SSDs 512GB -->
+            <!-- SEÇÃO 5: NVMe 2TB Custo-Benefício Destaque (Kingston NV3, WD SN580, Crucial P3 Plus) -->
             <div style="margin-bottom: 25px;">
                 <div style="display: flex; align-items: center; margin-bottom: 10px;">
                     <h2 style="margin: 0; font-size: 16px; font-weight: 700; color: #0e2a47;">
-                        💾 Armazenamento — SSDs de 512GB (e 480GB/500GB)
+                        ⚡ SSDs NVMe 2TB — Melhores Custo-Benefício (Kingston NV3, WD Blue SN580, Crucial P3 Plus)
                     </h2>
                 </div>
-                {render_category_table(ssds_512, "SSD 512GB", max_items=8)}
+                {render_category_table(nvme_top_2tb, "NVMe 2TB Top", max_items=8)}
             </div>
 
-            <!-- SEÇÃO 6: SSDs 1TB -->
+            <!-- SEÇÃO 6: SSDs 1TB Gerais Mais Baratos -->
             <div style="margin-bottom: 25px;">
                 <div style="display: flex; align-items: center; margin-bottom: 10px;">
                     <h2 style="margin: 0; font-size: 16px; font-weight: 700; color: #0e2a47;">
-                        💾 Armazenamento — SSDs de 1TB (e 960GB/1000GB)
+                        💾 Armazenamento — SSDs de 1TB (Mais Baratos Gerais)
                     </h2>
                 </div>
                 {render_category_table(ssds_1tb, "SSD 1TB", max_items=8)}
             </div>
 
+            <!-- SEÇÃO 7: SSDs 2TB Gerais Mais Baratos -->
+            <div style="margin-bottom: 25px;">
+                <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                    <h2 style="margin: 0; font-size: 16px; font-weight: 700; color: #0e2a47;">
+                        💾 Armazenamento — SSDs de 2TB (Mais Baratos Gerais)
+                    </h2>
+                </div>
+                {render_category_table(ssds_2tb, "SSD 2TB", max_items=8)}
+            </div>
+
+            <!-- SEÇÃO 8: SSDs 512GB Mais Baratos Gerais -->
+            <div style="margin-bottom: 25px;">
+                <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                    <h2 style="margin: 0; font-size: 16px; font-weight: 700; color: #0e2a47;">
+                        💾 Armazenamento — SSDs de 512GB / 480GB (Mais Baratos Gerais)
+                    </h2>
+                </div>
+                {render_category_table(ssds_512, "SSD 512GB", max_items=8)}
+            </div>
+
             <!-- ANÁLISE DE MERCADO (ÚLTIMAS 24H) - Conforme imagem TechCorp -->
             <div style="margin-top: 35px; border-top: 2px solid #e2e8f0; padding-top: 22px;">
                 <h3 style="margin: 0 0 12px 0; font-size: 14px; font-weight: 700; color: #0e2a47; text-transform: uppercase; letter-spacing: 0.5px;">
-                    ANÁLISE DE MERCADO (ÚLTIMAS 24H) & RECOMENDAÇÕES PARA SERVIDOR DE IA
+                    ANÁLISE DE MERCADO (ÚLTIMAS 24H) & RECOMENDAÇÕES PARA HARDWARE & IA
                 </h3>
                 
                 <ul style="margin: 0 0 18px 0; padding-left: 20px; color: #334155; font-size: 13px; line-height: 1.6;">
-                    <li><strong>Melhor Custo/Benefício para Servidor de IA:</strong> {f"O modelo <strong>{best_ai.get('title')}</strong> na <strong>{best_ai.get('store', 'Pichau')}</strong> lidera o ranking nacional com <strong>R$ {best_ai.get('cost_per_gb', 0):,.2f} por GB de VRAM</strong> ({format_currency(best_ai.get('final_price_32gb', best_ai.get('price', 0)))} montado com 32GB), sendo a melhor porta de entrada para rodar LLMs (LLaMA-3, Mistral) localmente." if best_ai else "No momento nenhuma máquina com 32GB de RAM montada foi encontrada em estoque. Acompanhe a lista de PCs de 12GB e 16GB abaixo para montar ou adicionar memória individualmente."}</li>
-                    <li><strong>GPUs NVIDIA 12GB vs 16GB:</strong> As máquinas com <strong>RTX 3060 12GB</strong> oferecem o menor desembolso total, enquanto configurações com <strong>RTX 4060 Ti 16GB / RTX 4070 Ti Super 16GB</strong> são recomendadas caso o seu servidor vá executar modelos de 14B parâmetros (como Qwen 2.5 14B) ou fine-tuning LoRA.</li>
-                    <li><strong>PCs 8GB VRAM (NVIDIA e AMD):</strong> A <strong>TerabyteShop</strong> domina a faixa de entrada mais econômica a partir de <strong>{format_currency(best_pc_8gb.get('price', 0)) if best_pc_8gb else 'R$ 1.899,99'}</strong> com RX 580 8GB, e a Pichau oferece alternativas com RX 7600 a R$ 3.749,96.</li>
-                    <li><strong>Memória RAM & SSD para o Servidor:</strong> A <strong>TerabyteShop</strong> ({format_currency(best_ram.get('price', 0)) if best_ram else 'R$ 679,99'}) e <strong>Pichau</strong> (R$ 699,99) disputam o menor preço de 16GB DDR4 3200MHz. Para armazenamento de modelos de IA (GGUF/Safetensors), a <strong>Amazon</strong> lidera em SSDs de 512GB ({format_currency(best_ssd_512.get('price', 0)) if best_ssd_512 else 'R$ 394,25'}) e a Terabyte/Pichau em 1TB ({format_currency(best_ssd_1tb.get('price', 0)) if best_ssd_1tb else 'R$ 759,90'}).</li>
+                    <li><strong>Melhor Custo/Benefício para Servidor de IA (PCs 32GB):</strong> {f"O modelo <strong>{best_ai.get('title')}</strong> na <strong>{best_ai.get('store', 'Pichau')}</strong> lidera o ranking nacional com <strong>R$ {best_ai.get('cost_per_gb', 0):,.2f} por GB de VRAM</strong> ({format_currency(best_ai.get('final_price_32gb', best_ai.get('price', 0)))} montado com 32GB)." if best_ai else "No momento nenhuma máquina com 32GB de RAM montada foi encontrada em estoque."}</li>
+                    <li><strong>Memória Destaque Mancer Dantalion:</strong> {f"A <strong>Mancer Dantalion 16GB DDR4 3200MHz CL19</strong> está cotada a <strong>{format_currency(best_dantalion.get('price', 0))}</strong> na {best_dantalion.get('store', 'Pichau')}." if best_dantalion else "A memória Mancer Dantalion 16GB está sendo acompanhada na Pichau."}</li>
+                    <li><strong>Memórias RAM Marcas Preferidas:</strong> O melhor preço entre as marcas favoritas (Kingston Fury, XPG Gammix D35, Corsair Vengeance, Crucial) está saindo a <strong>{format_currency(best_top_ram.get('price', 0)) if best_top_ram else 'R$ 720,00'}</strong> ({best_top_ram.get('store', 'Loja') if best_top_ram else ''}).</li>
+                    <li><strong>Armazenamento NVMe Custo-Benefício:</strong> Para 1TB (Kingston NV3 / WD SN580 / Crucial P3), o menor preço encontrado é <strong>{format_currency(best_nvme_1tb.get('price', 0)) if best_nvme_1tb else 'R$ 690,00'}</strong>. Para 2TB, temos opções a partir de <strong>{format_currency(best_nvme_2tb.get('price', 0)) if best_nvme_2tb else 'R$ 1.200,00'}</strong>.</li>
                 </ul>
 
                 <h4 style="margin: 0 0 8px 0; font-size: 13px; font-weight: 700; color: #0e2a47;">

@@ -27,7 +27,10 @@ from scrapers import (
     extract_gpu_name,
     get_ai_recommendation,
     analyze_pc_ram_upgrade,
-    check_pichau_bundle_32gb_options
+    check_pichau_bundle_32gb_options,
+    is_top_brand_ram,
+    is_preferred_nvme_model,
+    is_nvme_ssd
 )
 from notifier import send_email_alert
 
@@ -225,10 +228,29 @@ async def run_radar():
     # Ordena pelo melhor custo-benefício de VRAM já considerando a máquina montada com 32GB!
     ai_ranking = sorted(ai_ranking, key=lambda x: (x['cost_per_gb'], x['final_price_32gb']))
 
+    # Separação e categorização inteligente de Memórias RAM 16GB DDR4
+    # 1. Mancer Dantalion (sempre no topo se disponível)
+    mancer_dantalion = [r for r in all_rams if "DANTALION" in r.get('title', '').upper()]
+    # 2. Marcas Preferidas (Kingston Fury Beast, XPG Gammix D35, Corsair Vengeance LPX, Crucial)
+    top_brand_rams = sorted([r for r in all_rams if is_top_brand_ram(r.get('title', '')) and r not in mancer_dantalion], key=lambda x: x['price'])
+    # 3. Mais baratas gerais
+    cheapest_rams = sorted([r for r in all_rams if r not in mancer_dantalion and r not in top_brand_rams], key=lambda x: x['price'])
+    # Lista combinada para exibição/histórico
+    rams_16gb = (mancer_dantalion[:1] if mancer_dantalion else []) + top_brand_rams + cheapest_rams
+
+    # Separação e categorização de Armazenamento SSD
+    # 1. NVMe Custo-Benefício Destaques (1TB e 2TB: Kingston NV3, WD Blue SN580, Crucial P3 Plus)
+    nvme_top_1tb = sorted([s for s in all_ssds if s.get('capacity') == '1TB' and is_preferred_nvme_model(s.get('title', ''))], key=lambda x: x['price'])
+    nvme_top_2tb = sorted([s for s in all_ssds if s.get('capacity') == '2TB' and is_preferred_nvme_model(s.get('title', ''))], key=lambda x: x['price'])
+    
+    # 2. NVMe Gerais (1TB e 2TB)
+    nvme_general_1tb = sorted([s for s in all_ssds if s.get('capacity') == '1TB' and is_nvme_ssd(s.get('title', '')) and s not in nvme_top_1tb], key=lambda x: x['price'])
+    nvme_general_2tb = sorted([s for s in all_ssds if s.get('capacity') == '2TB' and is_nvme_ssd(s.get('title', '')) and s not in nvme_top_2tb], key=lambda x: x['price'])
+
+    # 3. SSDs Mais Baratos Gerais (por capacidade)
     ssds_512 = sorted([s for s in all_ssds if s.get('capacity') == '512GB'], key=lambda x: x['price'])
     ssds_1tb = sorted([s for s in all_ssds if s.get('capacity') == '1TB'], key=lambda x: x['price'])
-
-    rams_16gb = sorted(all_rams, key=lambda x: x['price'])
+    ssds_2tb = sorted([s for s in all_ssds if s.get('capacity') == '2TB'], key=lambda x: x['price'])
 
     # Resumo no terminal
     print("\n" + "=" * 60)
@@ -246,28 +268,37 @@ async def run_radar():
         print(f"     -> Placa: {ram_info.get('mobo', 'M-ATX')} ({ram_info.get('slots', 2)} slots) | Status 32GB: {p.get('ram_status_tag')}")
         print(f"     -> Recomendação IA: {p['ai_recommendation']}")
 
-    print("\n[PCs COM 12GB VRAM - EXCLUSIVO NVIDIA]:")
-    for p in pcs_12gb[:8]:
-        print(f"  [{p['store']}] {format_currency(p['price'])} - {p['title'][:65]}")
+    if mancer_dantalion:
+        print("\n[MEMORIA MANCER DANTALION 16GB (DESTAQUE FIXO)]:")
+        for r in mancer_dantalion[:2]:
+            print(f"  [{r['store']}] {format_currency(r['price'])} - {r['title'][:65]}")
 
-    print("\n[PCs COM 16GB VRAM - EXCLUSIVO NVIDIA]:")
-    for p in pcs_16gb[:8]:
-        print(f"  [{p['store']}] {format_currency(p['price'])} - {p['title'][:65]}")
-
-    print("\n[PCs COM 8GB VRAM - NVIDIA E AMD]:")
-    for p in pcs_8gb[:8]:
-        print(f"  [{p['store']}] {format_currency(p['price'])} - {p['title'][:65]}")
-
-    print("\n[MEMORIAS RAM 16GB DDR4 GAMER]:")
-    for r in rams_16gb[:10]:
+    print("\n[MEMORIAS RAM 16GB DDR4 (MARCAS PREFERIDAS: KINGSTON FURY, XPG D35, CORSAIR LPX, CRUCIAL)]:")
+    for r in top_brand_rams[:6]:
         print(f"  [{r['store']}] {format_currency(r['price'])} - {r['title'][:65]}")
 
-    print("\n[SSDs 512GB]:")
-    for s in ssds_512[:8]:
+    print("\n[MEMORIAS RAM 16GB DDR4 (MAIS BARATAS GERAIS)]:")
+    for r in cheapest_rams[:6]:
+        print(f"  [{r['store']}] {format_currency(r['price'])} - {r['title'][:65]}")
+
+    print("\n[SSDs NVMe 1TB CUSTO-BENEFÍCIO (KINGSTON NV3, WD SN580, CRUCIAL P3)]:")
+    for s in nvme_top_1tb[:6]:
         print(f"  [{s['store']}] {format_currency(s['price'])} - {s['title'][:65]}")
 
-    print("\n[SSDs 1TB]:")
-    for s in ssds_1tb[:8]:
+    print("\n[SSDs NVMe 2TB CUSTO-BENEFÍCIO (KINGSTON NV3, WD SN580, CRUCIAL P3)]:")
+    for s in nvme_top_2tb[:6]:
+        print(f"  [{s['store']}] {format_currency(s['price'])} - {s['title'][:65]}")
+
+    print("\n[SSDs 1TB (MAIS BARATOS GERAIS)]:")
+    for s in ssds_1tb[:6]:
+        print(f"  [{s['store']}] {format_currency(s['price'])} - {s['title'][:65]}")
+
+    print("\n[SSDs 2TB (MAIS BARATOS GERAIS)]:")
+    for s in ssds_2tb[:6]:
+        print(f"  [{s['store']}] {format_currency(s['price'])} - {s['title'][:65]}")
+
+    print("\n[SSDs 512GB (MAIS BARATOS GERAIS)]:")
+    for s in ssds_512[:6]:
         print(f"  [{s['store']}] {format_currency(s['price'])} - {s['title'][:65]}")
         
     print("=" * 60 + "\n")
@@ -275,12 +306,17 @@ async def run_radar():
     # Envio do e-mail e geração de relatório
     report_data = {
         'ai_ranking': ai_ranking,
-        'pcs_8gb': pcs_8gb,
-        'pcs_12gb': pcs_12gb,
-        'pcs_16gb': pcs_16gb,
+        'mancer_dantalion': mancer_dantalion,
+        'top_brand_rams': top_brand_rams,
+        'cheapest_rams': cheapest_rams,
         'rams_16gb': rams_16gb,
-        'ssds_512': ssds_512,
+        'nvme_top_1tb': nvme_top_1tb,
+        'nvme_top_2tb': nvme_top_2tb,
+        'nvme_general_1tb': nvme_general_1tb,
+        'nvme_general_2tb': nvme_general_2tb,
         'ssds_1tb': ssds_1tb,
+        'ssds_2tb': ssds_2tb,
+        'ssds_512': ssds_512,
     }
 
     send_email_alert(report_data)

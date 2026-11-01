@@ -88,10 +88,19 @@ class KabumScraper:
         return results
 
     def get_ssds(self) -> List[Dict[str, Any]]:
-        """Busca SSDs de 512GB e 1TB na Kabum."""
+        """Busca SSDs de 512GB, 1TB e 2TB (incluindo NVMe de referência) na Kabum."""
         results = []
         seen_codes = set()
-        queries = ["ssd 512gb", "ssd 1tb"]
+        queries = [
+            "ssd 512gb",
+            "ssd 1tb",
+            "ssd 2tb",
+            "ssd nvme 1tb",
+            "ssd nvme 2tb",
+            "kingston nv3",
+            "wd blue sn580",
+            "crucial p3 plus"
+        ]
         
         for q in queries:
             url = f"https://www.kabum.com.br/busca/{q.replace(' ', '-')}?page_number=1&page_size=30&sort=price&direction=asc"
@@ -108,7 +117,7 @@ class KabumScraper:
                     continue
                     
                 price = clean_price(item.get('priceWithDiscount') or item.get('price'))
-                if not price or not (80 <= price <= 1500):
+                if not price or not (80 <= price <= 3000):
                     continue
                     
                 results.append({
@@ -123,10 +132,17 @@ class KabumScraper:
         return results
 
     def get_ram_16gb_ddr4(self) -> List[Dict[str, Any]]:
-        """Busca memórias RAM 16GB DDR4 mais baratas na Kabum."""
+        """Busca memórias RAM 16GB DDR4 na Kabum (gerais e marcas preferidas)."""
         results = []
         seen_codes = set()
-        queries = ["memoria ram 16gb ddr4", "memoria 16gb ddr4"]
+        queries = [
+            "memoria ram 16gb ddr4",
+            "memoria 16gb ddr4",
+            "fury beast 16gb ddr4",
+            "gammix d35 16gb",
+            "corsair vengeance 16gb ddr4",
+            "crucial 16gb ddr4"
+        ]
         
         for q in queries:
             url = f"https://www.kabum.com.br/busca/{q.replace(' ', '-')}?page_number=1&page_size=30&sort=price&direction=asc"
@@ -142,7 +158,7 @@ class KabumScraper:
                     continue
                     
                 price = clean_price(item.get('priceWithDiscount') or item.get('price'))
-                if not price or not (100 <= price <= 1000):
+                if not price or not (100 <= price <= 1800):
                     continue
                     
                 results.append({
