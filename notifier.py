@@ -107,6 +107,7 @@ def calculate_variation(item: Dict[str, Any], history: Dict[str, float]) -> tupl
 
 def get_report_items(data: Dict[str, Any]) -> List[Dict[str, Any]]:
     sections = (
+        ("rtx_3060_12gb", 8),
         ("mancer_dantalion", 2),
         ("top_brand_rams", 8),
         ("cheapest_rams", 8),
@@ -236,6 +237,7 @@ def generate_html_report(data: Dict[str, Any], history: Dict[str, float] | None 
         '''
         return table_html
 
+    rtx_3060_12gb = data.get('rtx_3060_12gb', [])
     mancer_dantalion = data.get('mancer_dantalion', [])
     top_brand_rams = data.get('top_brand_rams', [])
     cheapest_rams = data.get('cheapest_rams', [])
@@ -252,6 +254,7 @@ def generate_html_report(data: Dict[str, Any], history: Dict[str, float] | None 
     best_nvme_1tb = nvme_top_1tb[0] if nvme_top_1tb else (nvme_general_1tb[0] if nvme_general_1tb else None)
     best_nvme_2tb = nvme_top_2tb[0] if nvme_top_2tb else (nvme_general_2tb[0] if nvme_general_2tb else None)
     best_dantalion = mancer_dantalion[0] if mancer_dantalion else None
+    best_rtx_3060_12gb = rtx_3060_12gb[0] if rtx_3060_12gb else None
 
     def render_source_health(source_health: Dict[str, Any]) -> str:
         status_labels = {
@@ -317,7 +320,7 @@ def generate_html_report(data: Dict[str, Any], history: Dict[str, float] | None 
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Relatório Diário de Preços - SSDs e Memórias RAM</title>
+    <title>Relatório Diário de Preços - RTX 3060 12GB, SSDs e Memórias RAM</title>
     <style>
         @media only screen and (max-width: 600px) {{
             .radar-product-table, .radar-health-table {{ min-width: 0 !important; width: 100% !important; }}
@@ -356,7 +359,7 @@ def generate_html_report(data: Dict[str, Any], history: Dict[str, float] | None 
                                 </td>
                                 <td style="vertical-align: middle; text-align: left;">
                                     <div style="font-size: 16px; font-weight: 800; color: #0e2a47; line-height: 1.1;">RadarPreços</div>
-                                    <div style="font-size: 10px; color: #64748b; letter-spacing: 0.3px;">SSDs & MEMÓRIAS RAM</div>
+                                    <div style="font-size: 10px; color: #64748b; letter-spacing: 0.3px;">RTX 3060 12GB & SSDs & RAM</div>
                                 </td>
                             </tr>
                         </table>
@@ -366,19 +369,28 @@ def generate_html_report(data: Dict[str, Any], history: Dict[str, float] | None 
             
             <div style="margin-top: 22px;">
                 <h1 style="margin: 0; font-size: 22px; font-weight: 700; color: #0e2a47;">
-                    RELATÓRIO DIÁRIO DE PREÇOS - SSDs & Memórias RAM
+                    RELATÓRIO DIÁRIO DE PREÇOS - RTX 3060 12GB, SSDs & Memórias RAM
                 </h1>
                 <p style="margin: 6px 0 0 0; font-size: 14px; color: #475569;">
                     Olá, <strong>Yury</strong>,
                 </p>
                 <p style="margin: 4px 0 0 0; font-size: 13px; color: #64748b; line-height: 1.5;">
-                    Abaixo está a seleção monitorada de <strong>Memórias RAM 16GB DDR4 (Mancer Dantalion, Kingston Fury, XPG D35, Corsair, Crucial)</strong> e <strong>SSDs (Kingston NV3, WD Blue SN580, Crucial P3 Plus e demais modelos)</strong>.
+                    Abaixo está a seleção monitorada de <strong>NVIDIA GeForce RTX 3060 12GB</strong>, <strong>Memórias RAM 16GB DDR4 (Mancer Dantalion, Kingston Fury, XPG D35, Corsair, Crucial)</strong> e <strong>SSDs (Kingston NV3, WD Blue SN580, Crucial P3 Plus e demais modelos)</strong>.
                 </p>
             </div>
         </div>
 
         <div style="padding: 25px 30px;">
             
+            <div style="margin-bottom: 25px;">
+                <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                    <h2 style="margin: 0; font-size: 16px; font-weight: 700; color: #0e2a47;">
+                        NVIDIA GeForce RTX 3060 12GB — Mais Baratas
+                    </h2>
+                </div>
+                {render_category_table(rtx_3060_12gb, "RTX 3060 12GB", max_items=8)}
+            </div>
+
             <!-- SEÇÃO DESTAQUE FIXO: MEMÓRIA MANCER DANTALION 16GB 3200MHz -->
             {f'''
             <div style="margin-bottom: 25px;">
@@ -470,6 +482,7 @@ def generate_html_report(data: Dict[str, Any], history: Dict[str, float] | None 
                 </h3>
                 
                 <ul style="margin: 0 0 18px 0; padding-left: 20px; color: #334155; font-size: 13px; line-height: 1.6;">
+                    <li><strong>NVIDIA RTX 3060 12GB:</strong> {f"A placa RTX 3060 12GB mais barata está saindo a <strong>{format_currency(best_rtx_3060_12gb.get('price', 0))}</strong> ({esc(best_rtx_3060_12gb.get('store', 'Loja'))})." if best_rtx_3060_12gb else "Nenhuma oferta válida de RTX 3060 12GB foi encontrada nesta coleta."}</li>
                     <li><strong>Memória Destaque Mancer Dantalion:</strong> {f"A <strong>Mancer Dantalion 16GB DDR4 3200MHz CL19</strong> está cotada a <strong>{format_currency(best_dantalion.get('price', 0))}</strong> na {esc(best_dantalion.get('store', 'Pichau'))}." if best_dantalion else "A memória Mancer Dantalion 16GB não foi encontrada nesta coleta."}</li>
                     <li><strong>Memórias RAM Marcas Preferidas:</strong> {f"O melhor preço entre as marcas favoritas (Kingston Fury, XPG Gammix D35, Corsair Vengeance, Crucial) está saindo a <strong>{format_currency(best_top_ram.get('price', 0))}</strong> ({esc(best_top_ram.get('store', 'Loja'))})." if best_top_ram else "Nenhum preço entre as marcas favoritas foi encontrado nesta coleta."}</li>
                     <li><strong>Armazenamento NVMe Custo-Benefício:</strong> {f"Para 1TB (Kingston NV3 / WD SN580 / Crucial P3), o menor preço encontrado é <strong>{format_currency(best_nvme_1tb.get('price', 0))}</strong>. Para 2TB, temos opções a partir de <strong>{format_currency(best_nvme_2tb.get('price', 0))}</strong>." if best_nvme_1tb and best_nvme_2tb else "Não há preços suficientes de NVMe 1TB e 2TB para comparar nesta coleta."}</li>
@@ -482,7 +495,7 @@ def generate_html_report(data: Dict[str, Any], history: Dict[str, float] | None 
                     <tr>
                         <td style="font-size: 11px; color: #64748b; vertical-align: middle;">
                             <strong>RadarPreços Global</strong><br>
-                            Monitoramento Automatizado de SSDs & Memórias RAM • Brasil
+                            Monitoramento Automatizado de RTX 3060 12GB, SSDs e Memórias RAM • Brasil
                         </td>
                         <td style="text-align: right; font-size: 11px; color: #64748b; vertical-align: middle;">
                             <span style="text-decoration: underline; color: #475569;">Gestão de Preferências</span> &nbsp;|&nbsp;
@@ -522,7 +535,7 @@ def send_email_alert(data: Dict[str, Any]) -> bool:
         return False
 
     msg = MIMEMultipart('alternative')
-    msg['Subject'] = f"RADAR DE SSDs E MEMÓRIAS RAM ({datetime.now().strftime('%d/%m/%Y')})"
+    msg['Subject'] = f"RADAR RTX 3060 12GB, SSDs E RAM ({datetime.now().strftime('%d/%m/%Y')})"
     msg['From'] = f"RadarPreços Bot <{sender_email}>"
     msg['To'] = receiver_email
 

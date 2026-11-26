@@ -16,6 +16,18 @@ def ssd_fixture():
     }
 
 
+def gpu_fixture():
+    return {
+        "title": "Placa de Vídeo NVIDIA GeForce RTX 3060 12GB GDDR6",
+        "price": 2199.99,
+        "vram": "12GB",
+        "store": "Kabum",
+        "warranty": "Garantia Kabum",
+        "link": "https://www.kabum.com.br/produto/test-rtx-3060-12gb",
+        "category": "GPU",
+    }
+
+
 class RunRadarTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self.kabum = Mock()
@@ -23,28 +35,33 @@ class RunRadarTests(unittest.IsolatedAsyncioTestCase):
         self.kabum.get_gaming_pcs.return_value = []
         self.kabum.get_ssds.return_value = []
         self.kabum.get_ram_16gb_ddr4.return_value = []
+        self.kabum.get_rtx_3060_12gb.return_value = []
 
         self.terabyte = Mock()
         self.terabyte.health = {}
         self.terabyte.get_gaming_pcs.return_value = []
         self.terabyte.get_ssds.return_value = []
         self.terabyte.get_ram_16gb_ddr4.return_value = []
+        self.terabyte.get_rtx_3060_12gb.return_value = []
 
         self.pichau = Mock()
         self.pichau.health = {}
         self.pichau.get_gaming_pcs = AsyncMock(return_value=[])
         self.pichau.get_ssds = AsyncMock(return_value=[])
         self.pichau.get_ram_16gb_ddr4 = AsyncMock(return_value=[])
+        self.pichau.get_rtx_3060_12gb = AsyncMock(return_value=[])
 
         self.amazon = Mock()
         self.amazon.health = {}
         self.amazon.get_ssds = AsyncMock(return_value=[])
         self.amazon.get_ram_16gb_ddr4 = AsyncMock(return_value=[])
+        self.amazon.get_rtx_3060_12gb = AsyncMock(return_value=[])
 
         self.mercadolivre = Mock()
         self.mercadolivre.health = {}
         self.mercadolivre.get_ssds = AsyncMock(return_value=[])
         self.mercadolivre.get_ram_16gb_ddr4 = AsyncMock(return_value=[])
+        self.mercadolivre.get_rtx_3060_12gb = AsyncMock(return_value=[])
 
         patches = [
             patch.object(main, "KabumScraper", return_value=self.kabum),
@@ -70,6 +87,28 @@ class RunRadarTests(unittest.IsolatedAsyncioTestCase):
         report_data = sender.call_args.args[0]
         self.assertNotIn("ai_ranking", report_data)
         self.assertNotIn("PC", report_data["source_health"]["Kabum"])
+
+    async def test_rtx_3060_12gb_collection_is_requested_and_sorted(self):
+        cheapest = gpu_fixture()
+        expensive = {
+            **gpu_fixture(),
+            "price": 2399.99,
+            "store": "Amazon",
+            "link": "https://www.amazon.com.br/dp/rtx-3060-12gb",
+        }
+        self.kabum.get_rtx_3060_12gb.return_value = [cheapest]
+        self.amazon.get_rtx_3060_12gb.return_value = [expensive]
+        sender = Mock(return_value=True)
+
+        with patch.object(main, "send_email_alert", sender):
+            await main.run_radar()
+
+        for scraper in (self.kabum, self.terabyte, self.pichau, self.amazon, self.mercadolivre):
+            scraper.get_rtx_3060_12gb.assert_called_once_with()
+        report_data = sender.call_args.args[0]
+        self.assertEqual(report_data["rtx_3060_12gb"], [cheapest, expensive])
+        self.assertEqual(report_data["source_health"]["Kabum"]["GPU"]["status"], "ok")
+        self.assertEqual(report_data["source_health"]["Amazon"]["GPU"]["status"], "ok")
 
     async def test_email_failure_fails_the_run(self):
         self.kabum.get_ssds.return_value = [ssd_fixture()]

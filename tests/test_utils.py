@@ -184,6 +184,120 @@ class RamClassificationTests(unittest.TestCase):
         self.assertTrue(utils.is_valid_ram_16gb_ddr4(title))
 
 
+class Rtx3060ClassificationTests(unittest.TestCase):
+    def test_standalone_rtx_3060_12gb_is_valid(self):
+        titles = (
+            "Placa de Vídeo NVIDIA GeForce RTX 3060 12GB GDDR6",
+            "GPU RTX 3060, 12 GB, GDDR6, 192-bit",
+            "RTX 3060 12GB GDDR6 para Desktop",
+            "Placa de Vídeo RTX3060 12GB GDDR6",
+            "Placa de Vídeo MSI RTX 3060 VENTUS 2X 12GB GDDR6",
+            "Placa de Vídeo RTX 3060 12GB GDDR6 MSI Ventus 2X",
+            "1x Placa de Vídeo RTX 3060 12GB",
+            "Placa de Vídeo RTX 3060 12GB 1 Unidade",
+            "Placa de Vídeo RTX 3060 12GB 1 Unid.",
+        )
+
+        for title in titles:
+            with self.subTest(title=title):
+                self.assertTrue(utils.is_rtx_3060_12gb(title))
+
+    def test_rtx_3060_8gb_is_rejected(self):
+        self.assertFalse(utils.is_rtx_3060_12gb("Placa de Vídeo RTX 3060 8GB GDDR6"))
+
+    def test_other_gpu_models_are_rejected(self):
+        titles = (
+            "Placa de Vídeo RTX 4070 12GB GDDR6X",
+            "Placa de Vídeo RTX 3060 Ti 8GB GDDR6",
+            "Placa de Vídeo RTX 3060 Ti 12GB GDDR6",
+            "Placa de Vídeo RTX 3060-TI 12GB GDDR6",
+            "Placa de Vídeo RTX 3060, Ti 12GB",
+            "Placa de Vídeo RTX 3060 (Super) 12GB",
+            "Placa de Vídeo RTX 3060 12GB Super",
+            "Placa de Vídeo RTX 3060 12GB (Super)",
+            "Placa de Vídeo RTX 3060 Super 12GB GDDR6",
+            "Placa de Vídeo RTX 3060 12GB e RTX 4070",
+            "Placa de Vídeo RTX 3060 12GB e RTX 4070 12GB",
+        )
+
+        for title in titles:
+            with self.subTest(title=title):
+                self.assertFalse(utils.is_rtx_3060_12gb(title))
+
+    def test_complete_pc_is_rejected(self):
+        self.assertFalse(utils.is_rtx_3060_12gb("PC Gamer RTX 3060 12GB 16GB DDR4 SSD 1TB"))
+
+    def test_accessories_are_rejected(self):
+        titles = (
+            "Kit Placa de Vídeo RTX 3060 12GB",
+            "Suporte para Placa de Vídeo RTX 3060 12GB",
+            "Backplate para NVIDIA GeForce RTX 3060 12GB",
+            "Bloco de Água para RTX 3060 12GB",
+            "Waterblock RTX 3060 12GB",
+            "Water Block RTX 3060 12GB",
+            "Water-Block para RTX 3060 12GB",
+            "Watercooler para RTX 3060 12GB",
+            "Water-Cooling Block para RTX 3060 12GB",
+            "Película protetora para RTX 3060 12GB",
+            "Capa de Proteção para Placa de Vídeo RTX 3060 12GB",
+            "Placa de Vídeo RTX 3060 12GB MXM",
+        )
+
+        for title in titles:
+            with self.subTest(title=title):
+                self.assertFalse(utils.is_rtx_3060_12gb(title))
+
+    def test_bundles_are_rejected(self):
+        titles = (
+            "Placa de Vídeo RTX 3060 12GB + SSD 1TB",
+            "Combo Placa de Vídeo RTX 3060 12GB",
+            "Bundle Placa de Vídeo RTX 3060 12GB",
+            "Placa de Vídeo RTX 3060 12GB 2x",
+            "Placa de Vídeo RTX 3060 12GB Pack 2 Unidades",
+            "Placa de Vídeo RTX 3060 12GB 2 Unidades",
+            "Placa de Vídeo RTX 3060 12GB 2 Unid.",
+            "Placa de Vídeo RTX 3060 12GB 2 pecas",
+            "Placa de Vídeo RTX 3060 12GB 2 pcs",
+            "Placa de Vídeo RTX 3060 12GB x2",
+            "Placa de Vídeo RTX 3060 12GB SSD 1TB",
+            "Placa de Vídeo RTX 3060 12GB 16GB RAM",
+            "Placa de Vídeo RTX 3060 12GB com SSD 1TB",
+            "Placa de Vídeo RTX 3060 12GB e SSD 1TB",
+            "Placa de Vídeo RTX 3060 12GB com Memória RAM 16GB",
+        )
+
+        for title in titles:
+            with self.subTest(title=title):
+                self.assertFalse(utils.is_rtx_3060_12gb(title))
+
+    def test_capacity_must_be_explicit(self):
+        self.assertFalse(utils.is_rtx_3060_12gb("Placa de Vídeo NVIDIA GeForce RTX 3060"))
+
+    def test_plural_gpu_quantity_is_rejected(self):
+        titles = (
+            "2 Placas de Vídeo NVIDIA GeForce RTX 3060 12GB",
+            "2 GPUs NVIDIA GeForce RTX 3060 12GB",
+            "Lote 2 Placas de Vídeo RTX 3060 12GB",
+            "Par de Placas de Vídeo RTX 3060 12GB",
+        )
+
+        for title in titles:
+            with self.subTest(title=title):
+                self.assertFalse(utils.is_rtx_3060_12gb(title))
+
+    def test_additional_ssd_without_capacity_is_rejected(self):
+        self.assertFalse(utils.is_rtx_3060_12gb("Placa de Vídeo RTX 3060 12GB SSD"))
+
+    def test_sticker_is_rejected(self):
+        self.assertFalse(utils.is_rtx_3060_12gb("Adesivo NVIDIA GeForce RTX 3060 12GB"))
+
+    def test_super_suffix_after_colon_is_rejected(self):
+        self.assertFalse(utils.is_rtx_3060_12gb("Placa de Vídeo RTX 3060: 12GB Super"))
+
+    def test_conflicting_vram_capacities_are_rejected(self):
+        self.assertFalse(utils.is_rtx_3060_12gb("Placa de Vídeo RTX 3060 8GB com até 12GB"))
+
+
 class SearchPageHealthTests(unittest.TestCase):
     def test_unrecognized_empty_page_is_an_error(self):
         status, detail = utils.classify_search_page("Página inesperada", 0)

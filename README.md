@@ -1,17 +1,21 @@
-# ⚡ Radar de Preços: SSDs e Memórias RAM 16GB DDR4 Gamer
+# Radar de Preços: RTX 3060 12GB, SSDs e Memórias RAM 16GB DDR4 Gamer
 
-Automação executada pelo GitHub Actions no seu PC Windows com runner self-hosted. Ela monitora os menores preços de SSDs e memórias RAM 16GB DDR4 gamer e envia um resumo formatado para o seu e-mail; para rodar sem acompanhamento, o PC e o runner precisam estar ligados, conectados à internet e disponíveis.
+Automação executada pelo GitHub Actions no seu PC Windows com runner self-hosted. Ela monitora os menores preços da NVIDIA GeForce RTX 3060 12GB avulsa, SSDs e memórias RAM 16GB DDR4 gamer e envia um resumo formatado para o seu e-mail; para rodar sem acompanhamento, o PC e o runner precisam estar ligados, conectados à internet e disponíveis.
 
 ---
 
 ## 🎯 O que este robô monitora?
 
-1. **Memórias RAM Gamer:**
+1. **Placa de vídeo NVIDIA:**
+   - **NVIDIA GeForce RTX 3060 12GB** avulsa *(Kabum, Terabyte, Pichau, Amazon, Mercado Livre)*
+   - Aceita somente títulos com **12GB explícito**; rejeita RTX 3060 8GB, outras placas, PCs montados, kits e acessórios.
+
+2. **Memórias RAM Gamer:**
    - Memórias RAM **16GB DDR4 Gamer** (Desktop) mais baratas *(Kabum, Terabyte, Pichau, Amazon, Mercado Livre)*
    - Destaque fixo para **Mancer Dantalion 16GB DDR4 3200MHz CL19**
    - Seleção de marcas preferidas: **Kingston Fury Beast, XPG Gammix D35, Corsair Vengeance LPX e Crucial**
 
-2. **SSDs:**
+3. **SSDs:**
    - SSDs de **512 GB** (e 480GB/500GB) mais baratos *(Kabum, Terabyte, Pichau, Amazon, Mercado Livre)*
    - SSDs de **1 TB** (e 960GB/1000GB) mais baratos *(Kabum, Terabyte, Pichau, Amazon, Mercado Livre)*
    - SSDs de **2 TB** (e 1,92TB/2000GB) mais baratos *(Kabum, Terabyte, Pichau, Amazon, Mercado Livre)*

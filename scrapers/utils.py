@@ -202,6 +202,57 @@ def _is_complete_pc_title(title: str) -> bool:
     ))
 
 
+def is_rtx_3060_12gb(title: str) -> bool:
+    t = re.sub(r'\s+', ' ', re.sub(r'[-_,():]', ' ', title.upper()))
+    product_text = re.sub(
+        r'\b(?:PARA|COMPAT[IÍ]VEL\s+COM)\s+(?:PCS?|COMPUTADOR(?:ES)?(?:\s+DESKTOP)?|DESKTOPS?)\b',
+        ' ',
+        t,
+    )
+    if re.search(
+        r'\b(PC|COMPUTADOR(?:ES)?|DESKTOP|CPU\s+GAMER|ALL\s+IN\s+ONE|NOTEBOOK|LAPTOP)\b',
+        product_text,
+    ):
+        return False
+    quantity_units = r'UNID(?:ADE)?S?|PE(?:Ç|C)AS?|PÇS?|PCS?|PLACAS?|GPUS?'
+    quantities = re.findall(rf'\b(\d+)\s*(?:{quantity_units})\b', t)
+    quantities.extend(re.findall(rf'\b(?:{quantity_units})\s*(\d+)\b', t))
+    quantities.extend(re.findall(r'^\s*(\d+)\s*[X×]\s+(?=\w)', t))
+    quantities.extend(re.findall(r'^\s*[X×]\s*(\d+)\s+(?=\w)', t))
+    quantities.extend(re.findall(rf'\b(\d+)\s*[X×]\s+(?:{quantity_units})\b', t))
+    quantities.extend(re.findall(rf'\b[X×]\s*(\d+)\s+(?:{quantity_units})\b', t))
+    quantities.extend(re.findall(r'\b(?:\d+\s*GB|GDDR\d+)\s+(\d+)\s*[X×]\b', t))
+    quantities.extend(re.findall(r'\b[X×]\s*(\d+)\s*$', t))
+    if any(int(quantity) > 1 for quantity in quantities):
+        return False
+    if re.search(r'\b(?:RAM|MEM[OÓ]RIA|SSD|HDD|HD)\b', t):
+        return False
+    if '+' in t or re.search(r'\b(?:PACK|PACOTE|LOTE)\b', t) or re.search(
+        r'\bPAR\s+DE\s+PLACAS?\b',
+        t,
+    ) or re.search(
+        r'\b(?:COM|E)\s+(?:SSD|HDD|HD|RAM|MEM[OÓ]RIA|FONTE|GABINETE|COOLER|WATER\s*COOLER|PLACA\s+M[ÃA]E|MOTHERBOARD|PROCESSADOR|CPU)\b',
+        t,
+    ) or re.search(
+        r'\b(KIT|COMBO|BUNDLE|SUPORTE|BASE|BACKPLATE|COOLER|WATER\s*(?:COOLER|COOLING(?:\s+BLOCK)?|BLOCK)|BLOCO\s+DE\s+ÁGUA|DISSIPADOR|PEL[IÍ]CULA|ADESIVO|CAPA|CABO|ADAPTADOR|GAVETA|CASE|ENCLOSURE|FONTE|GABINETE|PLACA\s+M[ÃA]E|MOTHERBOARD|MXM)\b',
+        t,
+    ):
+        return False
+    gpu_models = [
+        re.sub(r'\s+', '', model)
+        for model in re.findall(
+            r'\b(?:RTX|GTX|RX)\s*\d{3,4}(?:\s+(?:TI|SUPER|XT|XTX))?\b|\bARC\s+[AB]\d{3}\b',
+            t,
+        )
+    ]
+    if gpu_models != ["RTX3060"]:
+        return False
+    if re.search(r'\bRTX\s*3060\b(?:\s+12\s*GB)?\s+(?:TI|SUPER)\b', t):
+        return False
+    capacities = set(re.findall(r'\b(\d+)\s*GB\b(?!\s*/\s*S)', t))
+    return capacities == {"12"}
+
+
 def classify_ssd_capacity(title: str) -> Optional[str]:
     """Classifica a capacidade do SSD sem aceitar acessorios ou variantes ambiguas."""
     t = title.upper()

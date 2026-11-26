@@ -111,6 +111,51 @@ class PriceHistoryTests(NotifierTestCase):
         self.assertFalse(sent)
         self.assertFalse(self.history_path.exists())
 
+    def test_rtx_3060_12gb_is_rendered_and_historized(self):
+        gpu = item_fixture(
+            title="Placa de Vídeo NVIDIA GeForce RTX 3060 12GB GDDR6",
+            price=2199.99,
+            link="https://www.kabum.com.br/produto/rtx-3060-12gb",
+        )
+        gpu.update({"vram": "12GB", "category": "GPU"})
+        server = MagicMock()
+        smtp = MagicMock()
+        smtp.return_value.__enter__.return_value = server
+        env = {
+            "SENDER_EMAIL": "sender@example.com",
+            "SENDER_PASSWORD": "fake-password",
+            "RECEIVER_EMAIL": "receiver@example.com",
+            "SMTP_SERVER": "smtp.example.com",
+            "SMTP_PORT": "465",
+        }
+
+        with patch.dict(os.environ, env, clear=True), patch.object(notifier.smtplib, "SMTP_SSL", smtp):
+            sent = notifier.send_email_alert({"rtx_3060_12gb": [gpu]})
+
+        self.assertTrue(sent)
+        report = Path("ultimo_relatorio.html").read_text(encoding="utf-8")
+        self.assertIn("<title>Relatório Diário de Preços - RTX 3060 12GB, SSDs e Memórias RAM</title>", report)
+        self.assertIn("RTX 3060 12GB", report)
+        self.assertIn("R$ 2.199,99", report)
+        message = server.sendmail.call_args.args[2]
+        self.assertIn("Subject: RADAR RTX 3060 12GB", message)
+        history = json.loads(self.history_path.read_text(encoding="utf-8"))
+        self.assertEqual(history, {notifier.history_key(gpu): 2199.99})
+
+    def test_unrendered_rtx_3060_12gb_items_do_not_enter_history(self):
+        items = [
+            item_fixture(
+                title=f"Placa de Vídeo RTX 3060 12GB oferta {index}",
+                price=2199.99 + index,
+                link=f"https://www.kabum.com.br/produto/rtx-3060-12gb-{index}",
+            )
+            for index in range(9)
+        ]
+
+        delivered = notifier.get_report_items({"rtx_3060_12gb": items})
+
+        self.assertEqual(delivered, items[:8])
+
     def test_successful_email_saves_only_rendered_items(self):
         items = [item_fixture(price=499.0), item_fixture(title="SSD NVMe extra 1TB", price=599.0, link="https://www.kabum.com.br/produto/extra")]
         server = MagicMock()
@@ -163,7 +208,7 @@ class PriceHistoryTests(NotifierTestCase):
 
 
 class HtmlReportTests(NotifierTestCase):
-    def test_report_contains_only_ssd_and_ram_categories(self):
+    def test_report_ignores_removed_pc_and_ai_sections(self):
         pc = item_fixture(title="PC Gamer RTX 5060 Ti", link="https://www.kabum.com.br/produto/pc")
         ssd = item_fixture()
 

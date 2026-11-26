@@ -2,7 +2,7 @@ import logging
 import re
 from typing import List, Dict, Any
 from playwright.async_api import async_playwright
-from .utils import clean_price, classify_search_page, classify_ssd_capacity, is_valid_ram_16gb_ddr4, summarize_collection
+from .utils import clean_price, classify_search_page, classify_ssd_capacity, is_rtx_3060_12gb, is_valid_ram_16gb_ddr4, summarize_collection
 
 logger = logging.getLogger(__name__)
 
@@ -82,14 +82,14 @@ class MercadoLivreScraper:
                         href = href.split('?')[0] if '?' in href else href
                         
                         # Preço
-                        frac_el = card.locator('.andes-money-amount__fraction')
+                        frac_el = card.locator('.andes-money-amount--current .andes-money-amount__fraction')
                         if await frac_el.count() == 0:
                             continue
-                        price_str = await frac_el.first.inner_text()
+                        price_str = (await frac_el.first.inner_text()).replace('.', '')
                         
-                        cents_el = card.locator('.andes-money-amount__cents')
+                        cents_el = card.locator('.andes-money-amount--current .andes-money-amount__cents')
                         if await cents_el.count() > 0:
-                            price_str += '.' + await cents_el.first.inner_text()
+                            price_str += ',' + await cents_el.first.inner_text()
                             
                         price = clean_price(price_str)
                         if not price or not (80 <= price <= 1500):
@@ -111,6 +111,96 @@ class MercadoLivreScraper:
             await browser.close()
 
         self.health['SSD'] = summarize_collection(len(results), errors, len(queries), blocked)
+        return results
+
+    async def get_rtx_3060_12gb(self) -> List[Dict[str, Any]]:
+        results = []
+        errors = []
+        blocked = 0
+        queries = ["placa-de-video-rtx-3060-12gb", "geforce-rtx-3060-12gb"]
+        seen_links = set()
+
+        async with async_playwright() as playwright:
+            browser = await playwright.chromium.launch(
+                headless=True,
+                args=['--no-sandbox']
+            )
+            context = await browser.new_context(locale="pt-BR")
+            page = await context.new_page()
+
+            for query in queries:
+                try:
+                    url = f"https://lista.mercadolivre.com.br/informatica/componentes-pc/placas-de-video/{query}_OrderId_PRICE_ASC_NoIndex_True"
+                    response = await page.goto(url, timeout=12000, wait_until="domcontentloaded")
+                    await page.wait_for_timeout(2000)
+                    if response.status in (401, 403, 429):
+                        errors.append(f"HTTP {response.status}")
+                        blocked += 1
+                        continue
+                    if response.status != 200:
+                        errors.append(f"HTTP {response.status}")
+                        continue
+                    if "account-verification" in page.url:
+                        errors.append("account-verification")
+                        blocked += 1
+                        continue
+                    cards = page.locator('li.ui-search-layout__item, .poly-card')
+                    count = await cards.count()
+                    status, detail = classify_search_page(await page.content(), count)
+                    if status:
+                        errors.append(f"{query}: {detail}")
+                        if status == "blocked":
+                            blocked += 1
+                        continue
+
+                    for index in range(min(count, 15)):
+                        card = cards.nth(index)
+                        title_el = card.locator('.poly-component__title, .ui-search-item__title, h2')
+                        if await title_el.count() == 0:
+                            continue
+                        title = await title_el.first.inner_text()
+                        if not is_rtx_3060_12gb(title):
+                            continue
+                        link_el = card.locator('a.ui-search-link, a.poly-component__title')
+                        if await link_el.count() == 0:
+                            continue
+                        href = await link_el.first.get_attribute('href')
+                        if not href:
+                            continue
+                        href = href.split('?')[0] if '?' in href else href
+                        if href in seen_links:
+                            continue
+                        fraction_el = card.locator(
+                            '.andes-money-amount--current .andes-money-amount__fraction'
+                        )
+                        if await fraction_el.count() == 0:
+                            continue
+                        price_text = (await fraction_el.first.inner_text()).replace('.', '')
+                        cents_el = card.locator(
+                            '.andes-money-amount--current .andes-money-amount__cents'
+                        )
+                        if await cents_el.count() > 0:
+                            price_text += ',' + await cents_el.first.inner_text()
+                        price = clean_price(price_text)
+                        if not price or not (1000 <= price <= 15000):
+                            continue
+                        seen_links.add(href)
+                        results.append({
+                            "title": title,
+                            "price": price,
+                            "vram": "12GB",
+                            "store": "Mercado Livre",
+                            "warranty": "Compra Garantida Mercado Livre",
+                            "link": href,
+                            "category": "GPU",
+                        })
+                except Exception as error:
+                    errors.append(str(error))
+                    logger.warning(f"[Mercado Livre GPU] Não foi possível obter dados para {query}: {error}")
+
+            await browser.close()
+
+        self.health["GPU"] = summarize_collection(len(results), errors, len(queries), blocked)
         return results
 
     async def get_ram_16gb_ddr4(self) -> List[Dict[str, Any]]:
@@ -184,14 +274,14 @@ class MercadoLivreScraper:
                         if href in seen_links:
                             continue
                             
-                        frac_el = card.locator('.andes-money-amount__fraction')
+                        frac_el = card.locator('.andes-money-amount--current .andes-money-amount__fraction')
                         if await frac_el.count() == 0:
                             continue
-                        price_str = await frac_el.first.inner_text()
+                        price_str = (await frac_el.first.inner_text()).replace('.', '')
                         
-                        cents_el = card.locator('.andes-money-amount__cents')
+                        cents_el = card.locator('.andes-money-amount--current .andes-money-amount__cents')
                         if await cents_el.count() > 0:
-                            price_str += '.' + await cents_el.first.inner_text()
+                            price_str += ',' + await cents_el.first.inner_text()
                             
                         price = clean_price(price_str)
                         if not price or not (100 <= price <= 1000):

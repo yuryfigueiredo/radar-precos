@@ -3,7 +3,7 @@ import re
 import requests
 from bs4 import BeautifulSoup
 from typing import List, Dict, Any
-from .utils import clean_price, classify_pc_vram, classify_search_page, classify_ssd_capacity, is_valid_ram_16gb_ddr4, summarize_collection
+from .utils import clean_price, classify_pc_vram, classify_search_page, classify_ssd_capacity, is_rtx_3060_12gb, is_valid_ram_16gb_ddr4, summarize_collection
 
 logger = logging.getLogger(__name__)
 
@@ -34,8 +34,13 @@ class TerabyteScraper:
             if not href.startswith('http'):
                 href = f"https://www.terabyteshop.com.br{href}"
 
-            price_el = card.select_one('.product-item__new-price, .prod-new-price, [class*="new-price"]')
-            price_text = price_el.get_text() if price_el else card.get_text()
+            price_el = card.select_one(
+                '.product-item__new-price, .prod-new-price, [class*="new-price"], '
+                '.prod-price, .product-item__current-price, [class*="current-price"]'
+            )
+            if not price_el:
+                continue
+            price_text = price_el.get_text()
             m = re.search(r'R\$\s*([\d\.,]+)', price_text)
             price = clean_price(m.group(1)) if m else None
 
@@ -93,6 +98,47 @@ class TerabyteScraper:
                 errors.append(str(e))
                 logger.error(f"[Terabyte] Erro ao buscar PCs para {q}: {e}")
         self.health['PC'] = summarize_collection(len(results), errors, len(queries), blocked)
+        return results
+
+    def get_rtx_3060_12gb(self) -> List[Dict[str, Any]]:
+        results = []
+        errors = []
+        blocked = 0
+        queries = ["placa de video rtx 3060 12gb", "geforce rtx 3060 12gb"]
+        seen_links = set()
+
+        with requests.Session() as session:
+            for query in queries:
+                url = f"https://www.terabyteshop.com.br/busca?str={query.replace(' ', '+')}"
+                try:
+                    response = session.get(url, timeout=20)
+                    if response.status_code != 200:
+                        errors.append(f"HTTP {response.status_code}")
+                        if response.status_code in (401, 403, 429):
+                            blocked += 1
+                        continue
+                    soup = BeautifulSoup(response.text, "html.parser")
+                    products = self._parse_products_from_soup(soup)
+                    status, detail = classify_search_page(soup.get_text(" ", strip=True), len(products))
+                    if status:
+                        errors.append(f"{query}: {detail}")
+                        if status == "blocked":
+                            blocked += 1
+                        continue
+                    for product in products:
+                        if not is_rtx_3060_12gb(product["title"]):
+                            continue
+                        if product["link"] in seen_links or not (1000 <= product["price"] <= 15000):
+                            continue
+                        seen_links.add(product["link"])
+                        item = dict(product)
+                        item.update({"vram": "12GB", "category": "GPU"})
+                        results.append(item)
+                except Exception as error:
+                    errors.append(str(error))
+                    logger.error(f"[Terabyte] Erro ao buscar RTX 3060 12GB: {error}")
+
+        self.health["GPU"] = summarize_collection(len(results), errors, len(queries), blocked)
         return results
 
     def get_ssds(self) -> List[Dict[str, Any]]:

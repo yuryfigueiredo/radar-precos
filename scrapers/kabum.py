@@ -3,7 +3,7 @@ import logging
 import requests
 from bs4 import BeautifulSoup
 from typing import List, Dict, Any
-from .utils import clean_price, classify_pc_vram, classify_ssd_capacity, is_valid_ram_16gb_ddr4, summarize_collection
+from .utils import clean_price, classify_pc_vram, classify_ssd_capacity, is_rtx_3060_12gb, is_valid_ram_16gb_ddr4, summarize_collection
 
 logger = logging.getLogger(__name__)
 
@@ -18,9 +18,10 @@ class KabumScraper:
         self.session.headers.update(HEADERS)
         self.health = {}
 
-    def _fetch_next_data(self, url: str) -> List[Dict[str, Any]]:
+    def _fetch_next_data(self, url: str, session: requests.Session | None = None) -> List[Dict[str, Any]]:
         try:
-            r = self.session.get(url, timeout=20)
+            session = session or self.session
+            r = session.get(url, timeout=20)
             if r.status_code != 200:
                 raise RuntimeError(f"HTTP {r.status_code}")
             soup = BeautifulSoup(r.text, 'html.parser')
@@ -28,12 +29,17 @@ class KabumScraper:
             if not script or not script.string:
                 raise RuntimeError("__NEXT_DATA__ ausente")
             d = json.loads(script.string)
-            data_raw = d.get('props', {}).get('pageProps', {}).get('data', '{}')
+            props = d.get('props') if isinstance(d, dict) else None
+            page_props = props.get('pageProps') if isinstance(props, dict) else None
+            data_raw = page_props.get('data', '{}') if isinstance(page_props, dict) else '{}'
             if isinstance(data_raw, str):
                 catalog = json.loads(data_raw)
             else:
                 catalog = data_raw
-            return catalog.get('catalogServer', {}).get('data', [])
+            catalog_server = catalog.get('catalogServer') if isinstance(catalog, dict) else None
+            if not isinstance(catalog_server, dict) or not isinstance(catalog_server.get('data'), list):
+                raise RuntimeError("__NEXT_DATA__ sem catalogServer/data válido")
+            return catalog_server['data']
         except Exception as e:
             logger.error(f"[Kabum] Erro na busca: {e}")
             raise
@@ -96,6 +102,48 @@ class KabumScraper:
                     'category': 'PC'
                 })
         self.health['PC'] = summarize_collection(len(results), errors, len(queries), blocked)
+        return results
+
+    def get_rtx_3060_12gb(self) -> List[Dict[str, Any]]:
+        results = []
+        errors = []
+        blocked = 0
+        queries = ["placa de video rtx 3060 12gb", "geforce rtx 3060 12gb"]
+        seen_codes = set()
+
+        with requests.Session() as session:
+            for query in queries:
+                url = f"https://www.kabum.com.br/busca/{query.replace(' ', '-')}?page_number=1&page_size=30&sort=price&direction=asc"
+                try:
+                    items = self._fetch_next_data(url, session=session)
+                except Exception as error:
+                    detail = str(error)
+                    errors.append(detail)
+                    if any(code in detail for code in ("HTTP 401", "HTTP 403", "HTTP 429")):
+                        blocked += 1
+                    continue
+                for item in items:
+                    code = item.get("code")
+                    name = item.get("name", "")
+                    if not code or not is_rtx_3060_12gb(name):
+                        continue
+                    price = clean_price(item.get("priceWithDiscount") or item.get("price"))
+                    if not price or not (1000 <= price <= 15000):
+                        continue
+                    if code in seen_codes:
+                        continue
+                    seen_codes.add(code)
+                    results.append({
+                        "title": name,
+                        "price": price,
+                        "vram": "12GB",
+                        "store": "Kabum",
+                        "warranty": item.get("warranty", "Garantia Kabum"),
+                        "link": f"https://www.kabum.com.br/produto/{code}",
+                        "category": "GPU",
+                    })
+
+        self.health["GPU"] = summarize_collection(len(results), errors, len(queries), blocked)
         return results
 
     def get_ssds(self) -> List[Dict[str, Any]]:

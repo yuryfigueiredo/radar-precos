@@ -2,10 +2,11 @@ import asyncio
 import logging
 import re
 from typing import List, Dict, Any
+import requests as http_requests
 from bs4 import BeautifulSoup
 from curl_cffi import requests
 from playwright.async_api import async_playwright
-from .utils import clean_price, classify_pc_vram, classify_search_page, classify_ssd_capacity, is_valid_ram_16gb_ddr4, summarize_collection
+from .utils import clean_price, classify_pc_vram, classify_search_page, classify_ssd_capacity, is_rtx_3060_12gb, is_valid_ram_16gb_ddr4, summarize_collection
 
 logger = logging.getLogger(__name__)
 
@@ -208,6 +209,89 @@ class PichauScraper:
                     logger.warning(f"[Pichau Playwright Fallback] Erro: {e}")
         self.health['PC'] = summarize_collection(len(results), errors, attempted, blocked)
         return results
+
+    def _fetch_rtx_3060_12gb_sync(self) -> List[Dict[str, Any]]:
+        results = []
+        seen_links = set()
+        errors = []
+        blocked = 0
+        urls = [
+            "https://www.pichau.com.br/search?q=placa+de+video+rtx+3060+12gb&sort=price-asc",
+            "https://www.pichau.com.br/search?q=geforce+rtx+3060+12gb&sort=price-asc",
+        ]
+        session = http_requests.Session()
+        for url in urls:
+            try:
+                response = session.get(
+                    url,
+                    headers={"Accept-Language": "pt-BR,pt;q=0.9"},
+                    timeout=20,
+                )
+                if response.status_code != 200:
+                    errors.append(f"HTTP {response.status_code}")
+                    if response.status_code in (401, 403, 429):
+                        blocked += 1
+                    continue
+                soup = BeautifulSoup(response.text, "html.parser")
+                cards = soup.select('a[data-cy*="product"], a[href*="/placa-de-video-"]')
+                status, detail = classify_search_page(soup.get_text(" ", strip=True), len(cards))
+                if status:
+                    errors.append(f"{url}: {detail}")
+                    if status == "blocked":
+                        blocked += 1
+                    continue
+                for card in cards:
+                    href = card.get("href")
+                    if not href:
+                        continue
+                    if not href.startswith("http"):
+                        href = f"https://www.pichau.com.br{href}"
+                    if href in seen_links:
+                        continue
+                    raw_text = card.get_text(separator="\n")
+                    if "Esgotado" in raw_text:
+                        continue
+                    lines = [line.strip() for line in raw_text.split("\n") if line.strip()]
+                    title = next(
+                        (line for line in lines if "RTX" in line.upper() or "3060" in line),
+                        lines[0] if lines else "",
+                    )
+                    if not is_rtx_3060_12gb(title):
+                        continue
+                    price = None
+                    price_el = card.select_one('div[class*="price_vista"]')
+                    if price_el:
+                        price = clean_price(price_el.get_text())
+                    if not price:
+                        match = re.search(
+                            r'R\$\s*([\d\.,]+)\s*(?:a partir de\s*)?'
+                            r'(?:[0-9]+%\s*de\s*desconto\s+no\s+PIX|no\s+PIX|à\s+vista)',
+                            raw_text,
+                            re.IGNORECASE,
+                        )
+                        if match:
+                            price = clean_price(match.group(1))
+                    if not price or not (1000 <= price <= 15000):
+                        continue
+                    seen_links.add(href)
+                    results.append({
+                        "title": title,
+                        "price": price,
+                        "vram": "12GB",
+                        "store": "Pichau",
+                        "warranty": "Garantia Pichau",
+                        "link": href,
+                        "category": "GPU",
+                    })
+            except Exception as error:
+                errors.append(str(error))
+                logger.warning(f"[Pichau GPU] Erro em {url}: {error}")
+
+        self.health["GPU"] = summarize_collection(len(results), errors, len(urls), blocked)
+        return results
+
+    async def get_rtx_3060_12gb(self) -> List[Dict[str, Any]]:
+        return await asyncio.to_thread(self._fetch_rtx_3060_12gb_sync)
 
     # -------------------------------------------------------------
     # 2. SSDs (512GB, 1TB e 2TB)

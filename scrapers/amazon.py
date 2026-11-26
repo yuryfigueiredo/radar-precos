@@ -2,7 +2,7 @@ import logging
 import re
 from typing import List, Dict, Any
 from playwright.async_api import async_playwright
-from .utils import clean_price, classify_search_page, classify_ssd_capacity, is_valid_ram_16gb_ddr4, summarize_collection
+from .utils import clean_price, classify_search_page, classify_ssd_capacity, is_rtx_3060_12gb, is_valid_ram_16gb_ddr4, summarize_collection
 
 logger = logging.getLogger(__name__)
 
@@ -112,6 +112,91 @@ class AmazonScraper:
             await browser.close()
 
         self.health['SSD'] = summarize_collection(len(results), errors, len(queries), blocked)
+        return results
+
+    async def get_rtx_3060_12gb(self) -> List[Dict[str, Any]]:
+        results = []
+        errors = []
+        blocked = 0
+        queries = ["placa de video rtx 3060 12gb", "geforce rtx 3060 12gb"]
+        seen_links = set()
+
+        async with async_playwright() as playwright:
+            browser = await playwright.chromium.launch(
+                headless=True,
+                args=['--no-sandbox']
+            )
+            context = await browser.new_context(locale="pt-BR")
+            page = await context.new_page()
+
+            for query in queries:
+                try:
+                    url = f"https://www.amazon.com.br/s?k={query.replace(' ', '+')}"
+                    response = await page.goto(url, timeout=30000, wait_until="domcontentloaded")
+                    if response.status != 200:
+                        errors.append(f"HTTP {response.status}")
+                        if response.status in (401, 403, 429):
+                            blocked += 1
+                        continue
+                    await page.wait_for_timeout(2500)
+                    cards = page.locator('div[data-component-type="s-search-result"]')
+                    count = await cards.count()
+                    status, detail = await _classify_search_response(page, query, count)
+                    if status:
+                        errors.append(detail)
+                        if status == "blocked":
+                            blocked += 1
+                        continue
+
+                    for index in range(min(count, 35)):
+                        card = cards.nth(index)
+                        title_el = card.locator('h2 span, h2')
+                        if await title_el.count() == 0:
+                            continue
+                        title = await title_el.first.inner_text()
+                        if not is_rtx_3060_12gb(title):
+                            continue
+                        link_el = card.locator('a:has(h2), a[href*="/dp/"], h2 a')
+                        if await link_el.count() == 0:
+                            continue
+                        href = await link_el.first.get_attribute('href')
+                        if not href:
+                            continue
+                        if not href.startswith('http'):
+                            href = f"https://www.amazon.com.br{href}"
+                        href = href.split('/ref=')[0] if '/ref=' in href else href
+                        if href in seen_links:
+                            continue
+                        price_el = card.locator(
+                            '.a-price[data-a-strike="false"] .a-offscreen, '
+                            '.a-price:not([data-a-strike="true"]) .a-offscreen'
+                        )
+                        if await price_el.count() == 0:
+                            continue
+                        price_raw = await price_el.first.inner_text()
+                        match = re.search(r'R\$\s*([\d\.,]+)', price_raw)
+                        if not match:
+                            continue
+                        price = clean_price(match.group(1))
+                        if not price or not (1000 <= price <= 15000):
+                            continue
+                        seen_links.add(href)
+                        results.append({
+                            "title": title,
+                            "price": price,
+                            "vram": "12GB",
+                            "store": "Amazon",
+                            "warranty": "Garantia de Compra Protegida Amazon",
+                            "link": href,
+                            "category": "GPU",
+                        })
+                except Exception as error:
+                    errors.append(str(error))
+                    logger.error(f"[Amazon GPU] Erro ao buscar {query}: {error}")
+
+            await browser.close()
+
+        self.health["GPU"] = summarize_collection(len(results), errors, len(queries), blocked)
         return results
 
     async def get_ram_16gb_ddr4(self) -> List[Dict[str, Any]]:

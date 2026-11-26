@@ -63,21 +63,22 @@ async def collect_category(store: str, category: str, scraper: Any, fetch: Any) 
 
 async def run_radar():
     logger.info("=" * 60)
-    logger.info("Iniciando Radar de Precos: SSDs e RAMs 16GB DDR4")
+    logger.info("Iniciando Radar de Precos: RTX 3060 12GB, SSDs e RAMs 16GB DDR4")
     logger.info("=" * 60)
 
     all_ssds: List[Dict[str, Any]] = []
     all_rams: List[Dict[str, Any]] = []
+    all_rtx_3060_12gb: List[Dict[str, Any]] = []
 
     source_health: Dict[str, Dict[str, Dict[str, Any]]] = {}
     stores = [
-        ("Kabum", KabumScraper, {"SSD": "get_ssds", "RAM": "get_ram_16gb_ddr4"}),
-        ("TerabyteShop", TerabyteScraper, {"SSD": "get_ssds", "RAM": "get_ram_16gb_ddr4"}),
-        ("Pichau", PichauScraper, {"SSD": "get_ssds", "RAM": "get_ram_16gb_ddr4"}),
-        ("Amazon", AmazonScraper, {"SSD": "get_ssds", "RAM": "get_ram_16gb_ddr4"}),
-        ("Mercado Livre", MercadoLivreScraper, {"SSD": "get_ssds", "RAM": "get_ram_16gb_ddr4"}),
+        ("Kabum", KabumScraper, {"GPU": "get_rtx_3060_12gb", "SSD": "get_ssds", "RAM": "get_ram_16gb_ddr4"}),
+        ("TerabyteShop", TerabyteScraper, {"GPU": "get_rtx_3060_12gb", "SSD": "get_ssds", "RAM": "get_ram_16gb_ddr4"}),
+        ("Pichau", PichauScraper, {"GPU": "get_rtx_3060_12gb", "SSD": "get_ssds", "RAM": "get_ram_16gb_ddr4"}),
+        ("Amazon", AmazonScraper, {"GPU": "get_rtx_3060_12gb", "SSD": "get_ssds", "RAM": "get_ram_16gb_ddr4"}),
+        ("Mercado Livre", MercadoLivreScraper, {"GPU": "get_rtx_3060_12gb", "SSD": "get_ssds", "RAM": "get_ram_16gb_ddr4"}),
     ]
-    category_lists = {"SSD": all_ssds, "RAM": all_rams}
+    category_lists = {"GPU": all_rtx_3060_12gb, "SSD": all_ssds, "RAM": all_rams}
 
     for index, (store, scraper_class, categories) in enumerate(stores, 1):
         logger.info(f"[{index}/5] Buscando ofertas na {store}...")
@@ -94,6 +95,8 @@ async def run_radar():
             items, health = await collect_category(store, category, scraper, getattr(scraper, method_name))
             category_lists[category].extend(items)
             source_health[store][category] = health
+
+    rtx_3060_12gb = sorted(all_rtx_3060_12gb, key=lambda item: item["price"])
 
     # Separação e categorização inteligente de Memórias RAM 16GB DDR4
     # 1. Mancer Dantalion (sempre no topo se disponível)
@@ -124,6 +127,11 @@ async def run_radar():
     print("RESULTADOS DOS MENORES PRECOS ENCONTRADOS")
     print("=" * 60)
     
+    if rtx_3060_12gb:
+        print("\n[NVIDIA RTX 3060 12GB (MAIS BARATAS)]:")
+        for gpu in rtx_3060_12gb[:6]:
+            print(f"  [{gpu['store']}] {format_currency(gpu['price'])} - {gpu['title'][:65]}")
+
     if mancer_dantalion:
         print("\n[MEMORIA MANCER DANTALION 16GB (DESTAQUE FIXO)]:")
         for r in mancer_dantalion[:2]:
@@ -161,6 +169,7 @@ async def run_radar():
 
     # Envio do e-mail e geração de relatório
     report_data = {
+        'rtx_3060_12gb': rtx_3060_12gb,
         'mancer_dantalion': mancer_dantalion,
         'top_brand_rams': top_brand_rams,
         'cheapest_rams': cheapest_rams,
@@ -176,7 +185,7 @@ async def run_radar():
     }
 
     report_keys = (
-        'mancer_dantalion', 'top_brand_rams', 'cheapest_rams',
+        'rtx_3060_12gb', 'mancer_dantalion', 'top_brand_rams', 'cheapest_rams',
         'nvme_top_1tb', 'nvme_top_2tb', 'nvme_general_1tb', 'nvme_general_2tb',
         'ssds_1tb', 'ssds_2tb', 'ssds_512'
     )
