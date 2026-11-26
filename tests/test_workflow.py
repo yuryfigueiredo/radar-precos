@@ -22,9 +22,13 @@ class WorkflowTests(unittest.TestCase):
             re.DOTALL,
         )
         self.assertIsNotNone(prepare_step)
-        self.assertIn("shell: bash", prepare_step.group(1))
+        self.assertIn("shell: powershell", prepare_step.group(1))
+        self.assertNotIn("shell: bash", prepare_step.group(1))
+        self.assertNotIn("shell: pwsh", prepare_step.group(1))
         self.assertIn(r"C:\Program Files\Git\usr\bin", prepare_step.group(1))
-        self.assertIn('>> "$GITHUB_PATH"', prepare_step.group(1))
+        self.assertIn("Test-Path", prepare_step.group(1))
+        self.assertIn("Out-File", prepare_step.group(1))
+        self.assertIn("$env:GITHUB_PATH", prepare_step.group(1))
         self.assertIn("gzip.exe", prepare_step.group(1))
         self.assertIn("--version", prepare_step.group(1))
         self.assertLess(

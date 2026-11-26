@@ -25,10 +25,13 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Preparar ferramentas de cache
-        shell: bash
+        shell: powershell
         run: |
-          "/c/Program Files/Git/usr/bin/gzip.exe" --version
-          echo 'C:\Program Files\Git\usr\bin' >> "$GITHUB_PATH"
+          $gzipDir = 'C:\Program Files\Git\usr\bin'
+          $gzip = Join-Path $gzipDir 'gzip.exe'
+          if (-not (Test-Path -LiteralPath $gzip)) { throw "gzip not found: $gzip" }
+          & $gzip --version
+          $gzipDir | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: Instalar Dependências
         run: |
