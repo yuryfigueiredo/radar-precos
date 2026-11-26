@@ -11,7 +11,9 @@ from .utils import (
     check_pichau_bundle_32gb_options,
     is_top_brand_ram,
     is_preferred_nvme_model,
-    is_nvme_ssd
+    is_nvme_ssd,
+    has_native_32gb_ram,
+    summarize_collection
 )
 
 __all__ = [
@@ -27,5 +29,7 @@ __all__ = [
     'check_pichau_bundle_32gb_options',
     'is_top_brand_ram',
     'is_preferred_nvme_model',
-    'is_nvme_ssd'
+    'is_nvme_ssd',
+    'has_native_32gb_ram',
+    'summarize_collection'
 ]

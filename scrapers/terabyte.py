@@ -3,7 +3,7 @@ import re
 import requests
 from bs4 import BeautifulSoup
 from typing import List, Dict, Any
-from .utils import clean_price, classify_pc_vram, classify_ssd_capacity, is_valid_ram_16gb_ddr4
+from .utils import clean_price, classify_pc_vram, classify_search_page, classify_ssd_capacity, is_valid_ram_16gb_ddr4, summarize_collection
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +16,7 @@ class TerabyteScraper:
     def __init__(self):
         self.session = requests.Session()
         self.session.headers.update(HEADERS)
+        self.health = {}
 
     def _parse_products_from_soup(self, soup: BeautifulSoup) -> List[Dict[str, Any]]:
         items = []
@@ -51,6 +52,8 @@ class TerabyteScraper:
     def get_gaming_pcs(self) -> List[Dict[str, Any]]:
         """Busca PCs Gamer completos na Terabyte com foco em GPUs de 8GB, 12GB e 16GB."""
         results = []
+        errors = []
+        blocked = 0
         queries = [
             "computador gamer rx 6600",
             "computador gamer rtx 4060",
@@ -69,10 +72,15 @@ class TerabyteScraper:
             url = f"https://www.terabyteshop.com.br/busca?str={q.replace(' ', '+')}"
             try:
                 r = self.session.get(url, timeout=20)
-                if r.status_code == 200:
-                    soup = BeautifulSoup(r.text, 'html.parser')
-                    products = self._parse_products_from_soup(soup)
-                    for p in products:
+                if r.status_code != 200:
+                    error = f"HTTP {r.status_code}"
+                    errors.append(error)
+                    if r.status_code in (401, 403, 429):
+                        blocked += 1
+                    continue
+                soup = BeautifulSoup(r.text, 'html.parser')
+                products = self._parse_products_from_soup(soup)
+                for p in products:
                         if p['link'] in seen_links:
                             continue
                         seen_links.add(p['link'])
@@ -82,12 +90,16 @@ class TerabyteScraper:
                             p['category'] = 'PC'
                             results.append(p)
             except Exception as e:
+                errors.append(str(e))
                 logger.error(f"[Terabyte] Erro ao buscar PCs para {q}: {e}")
+        self.health['PC'] = summarize_collection(len(results), errors, len(queries), blocked)
         return results
 
     def get_ssds(self) -> List[Dict[str, Any]]:
         """Busca SSDs de 512GB, 1TB e 2TB na Terabyte."""
         results = []
+        errors = []
+        blocked = 0
         queries = ["ssd 512gb", "ssd 1tb", "ssd 2tb", "ssd nvme 1tb", "ssd nvme 2tb", "kingston nv3", "wd sn580", "crucial p3"]
         seen_links = set()
 
@@ -95,10 +107,21 @@ class TerabyteScraper:
             url = f"https://www.terabyteshop.com.br/busca?str={q.replace(' ', '+')}"
             try:
                 r = self.session.get(url, timeout=20)
-                if r.status_code == 200:
-                    soup = BeautifulSoup(r.text, 'html.parser')
-                    products = self._parse_products_from_soup(soup)
-                    for p in products:
+                if r.status_code != 200:
+                    error = f"HTTP {r.status_code}"
+                    errors.append(error)
+                    if r.status_code in (401, 403, 429):
+                        blocked += 1
+                    continue
+                soup = BeautifulSoup(r.text, 'html.parser')
+                products = self._parse_products_from_soup(soup)
+                status, detail = classify_search_page(soup.get_text(" ", strip=True), len(products))
+                if status:
+                    errors.append(f"{q}: {detail}")
+                    if status == "blocked":
+                        blocked += 1
+                    continue
+                for p in products:
                         if p['link'] in seen_links:
                             continue
                         seen_links.add(p['link'])
@@ -108,12 +131,16 @@ class TerabyteScraper:
                             p['category'] = 'SSD'
                             results.append(p)
             except Exception as e:
+                errors.append(str(e))
                 logger.error(f"[Terabyte] Erro ao buscar SSDs para {q}: {e}")
+        self.health['SSD'] = summarize_collection(len(results), errors, len(queries), blocked)
         return results
 
     def get_ram_16gb_ddr4(self) -> List[Dict[str, Any]]:
         """Busca memórias RAM 16GB DDR4 na TerabyteShop (incluindo marcas preferidas)."""
         results = []
+        errors = []
+        blocked = 0
         queries = [
             "memoria ddr4 16gb",
             "memoria ram ddr4 16gb",
@@ -128,10 +155,21 @@ class TerabyteScraper:
             url = f"https://www.terabyteshop.com.br/busca?str={q.replace(' ', '+')}"
             try:
                 r = self.session.get(url, timeout=20)
-                if r.status_code == 200:
-                    soup = BeautifulSoup(r.text, 'html.parser')
-                    products = self._parse_products_from_soup(soup)
-                    for p in products:
+                if r.status_code != 200:
+                    error = f"HTTP {r.status_code}"
+                    errors.append(error)
+                    if r.status_code in (401, 403, 429):
+                        blocked += 1
+                    continue
+                soup = BeautifulSoup(r.text, 'html.parser')
+                products = self._parse_products_from_soup(soup)
+                status, detail = classify_search_page(soup.get_text(" ", strip=True), len(products))
+                if status:
+                    errors.append(f"{q}: {detail}")
+                    if status == "blocked":
+                        blocked += 1
+                    continue
+                for p in products:
                         if p['link'] in seen_links:
                             continue
                         seen_links.add(p['link'])
@@ -139,5 +177,7 @@ class TerabyteScraper:
                             p['category'] = 'RAM'
                             results.append(p)
             except Exception as e:
+                errors.append(str(e))
                 logger.error(f"[Terabyte] Erro ao buscar RAMs para {q}: {e}")
+        self.health['RAM'] = summarize_collection(len(results), errors, len(queries), blocked)
         return results

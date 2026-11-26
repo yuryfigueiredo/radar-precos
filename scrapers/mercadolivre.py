@@ -2,14 +2,19 @@ import logging
 import re
 from typing import List, Dict, Any
 from playwright.async_api import async_playwright
-from .utils import clean_price, classify_ssd_capacity, is_valid_ram_16gb_ddr4
+from .utils import clean_price, classify_search_page, classify_ssd_capacity, is_valid_ram_16gb_ddr4, summarize_collection
 
 logger = logging.getLogger(__name__)
 
 class MercadoLivreScraper:
+    def __init__(self):
+        self.health = {}
+
     async def get_ssds(self) -> List[Dict[str, Any]]:
         """Busca SSDs de 512GB, 1TB e 2TB no Mercado Livre."""
         results = []
+        errors = []
+        blocked = 0
         queries = ["ssd-512gb", "ssd-1tb", "ssd-2tb", "ssd-nvme-1tb", "kingston-nv3"]
         
         async with async_playwright() as p:
@@ -27,16 +32,32 @@ class MercadoLivreScraper:
             for q in queries:
                 try:
                     url = f"https://lista.mercadolivre.com.br/informatica/armazenamento/discos-acessorios/ssds/{q}_OrderId_PRICE_ASC_NoIndex_True"
-                    await page.goto(url, timeout=12000, wait_until="domcontentloaded")
+                    response = await page.goto(url, timeout=12000, wait_until="domcontentloaded")
                     await page.wait_for_timeout(2000)
-                    
+
+                    if response.status_code in (401, 403, 429):
+                        errors.append(f"HTTP {response.status_code}")
+                        blocked += 1
+                        continue
+                    if response.status_code != 200:
+                        errors.append(f"HTTP {response.status_code}")
+                        continue
+
                     if "account-verification" in page.url:
                         logger.warning(f"[Mercado Livre SSD] Bloqueado por WAF/account-verification para {q}")
+                        errors.append("account-verification")
+                        blocked += 1
                         continue
                         
                     cards = page.locator('li.ui-search-layout__item, .poly-card')
                     count = await cards.count()
-                    
+                    status, detail = classify_search_page(await page.content(), count)
+                    if status:
+                        errors.append(f"{q}: {detail}")
+                        if status == "blocked":
+                            blocked += 1
+                        continue
+
                     for i in range(min(count, 15)):
                         card = cards.nth(i)
                         
@@ -84,15 +105,19 @@ class MercadoLivreScraper:
                             'category': 'SSD'
                         })
                 except Exception as e:
+                    errors.append(str(e))
                     logger.warning(f"[Mercado Livre] Não foi possível obter dados para {q}: {e}")
-                    
+
             await browser.close()
-            
+
+        self.health['SSD'] = summarize_collection(len(results), errors, len(queries), blocked)
         return results
 
     async def get_ram_16gb_ddr4(self) -> List[Dict[str, Any]]:
         """Busca memórias RAM 16GB DDR4 mais baratas no Mercado Livre."""
         results = []
+        errors = []
+        blocked = 0
         queries = ["memoria-ram-16gb-ddr4-desktop", "memoria-ddr4-16gb"]
         seen_links = set()
         
@@ -111,16 +136,32 @@ class MercadoLivreScraper:
             for q in queries:
                 try:
                     url = f"https://lista.mercadolivre.com.br/informatica/componentes-pc/memorias-ram/{q}_OrderId_PRICE_ASC_NoIndex_True"
-                    await page.goto(url, timeout=12000, wait_until="domcontentloaded")
+                    response = await page.goto(url, timeout=12000, wait_until="domcontentloaded")
                     await page.wait_for_timeout(2000)
-                    
+
+                    if response.status_code in (401, 403, 429):
+                        errors.append(f"HTTP {response.status_code}")
+                        blocked += 1
+                        continue
+                    if response.status_code != 200:
+                        errors.append(f"HTTP {response.status_code}")
+                        continue
+
                     if "account-verification" in page.url:
                         logger.warning(f"[Mercado Livre RAM] Bloqueado por WAF/account-verification para {q}")
+                        errors.append("account-verification")
+                        blocked += 1
                         continue
                         
                     cards = page.locator('li.ui-search-layout__item, .poly-card')
                     count = await cards.count()
-                    
+                    status, detail = classify_search_page(await page.content(), count)
+                    if status:
+                        errors.append(f"{q}: {detail}")
+                        if status == "blocked":
+                            blocked += 1
+                        continue
+
                     for i in range(min(count, 15)):
                         card = cards.nth(i)
                         
@@ -166,8 +207,10 @@ class MercadoLivreScraper:
                             'category': 'RAM'
                         })
                 except Exception as e:
+                    errors.append(str(e))
                     logger.warning(f"[Mercado Livre RAM] Não foi possível obter dados para {q}: {e}")
-                    
+
             await browser.close()
-            
+
+        self.health['RAM'] = summarize_collection(len(results), errors, len(queries), blocked)
         return results

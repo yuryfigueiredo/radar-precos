@@ -2,14 +2,23 @@ import logging
 import re
 from typing import List, Dict, Any
 from playwright.async_api import async_playwright
-from .utils import clean_price, classify_ssd_capacity, is_valid_ram_16gb_ddr4
+from .utils import clean_price, classify_search_page, classify_ssd_capacity, is_valid_ram_16gb_ddr4, summarize_collection
 
 logger = logging.getLogger(__name__)
 
+async def _classify_search_response(page: Any, query: str, result_count: int) -> tuple[str | None, str | None]:
+    status, detail = classify_search_page(await page.content(), result_count)
+    return status, f"{query}: {detail}" if detail else None
+
 class AmazonScraper:
+    def __init__(self):
+        self.health = {}
+
     async def get_ssds(self) -> List[Dict[str, Any]]:
         """Busca SSDs de 512GB, 1TB e 2TB na Amazon Brasil."""
         results = []
+        errors = []
+        blocked = 0
         queries = ["ssd 480gb", "ssd 512gb", "ssd 1tb", "ssd 2tb", "kingston nv3", "wd sn580", "crucial p3 plus"]
         seen_links = set()
         
@@ -27,11 +36,22 @@ class AmazonScraper:
             for q in queries:
                 try:
                     url = f"https://www.amazon.com.br/s?k={q.replace(' ', '+')}"
-                    await page.goto(url, timeout=30000, wait_until="domcontentloaded")
+                    response = await page.goto(url, timeout=30000, wait_until="domcontentloaded")
+                    if response.status_code != 200:
+                        errors.append(f"HTTP {response.status_code}")
+                        if response.status_code in (401, 403, 429):
+                            blocked += 1
+                        continue
                     await page.wait_for_timeout(2500)
                     
                     cards = page.locator('div[data-component-type="s-search-result"]')
                     count = await cards.count()
+                    status, detail = await _classify_search_response(page, q, count)
+                    if status:
+                        errors.append(detail)
+                        if status == "blocked":
+                            blocked += 1
+                        continue
                     
                     for i in range(min(count, 35)):
                         card = cards.nth(i)
@@ -86,15 +106,19 @@ class AmazonScraper:
                             'category': 'SSD'
                         })
                 except Exception as e:
+                    errors.append(str(e))
                     logger.error(f"[Amazon SSD] Erro ao buscar {q}: {e}")
                     
             await browser.close()
-            
+
+        self.health['SSD'] = summarize_collection(len(results), errors, len(queries), blocked)
         return results
 
     async def get_ram_16gb_ddr4(self) -> List[Dict[str, Any]]:
         """Busca memórias RAM 16GB DDR4 na Amazon Brasil (incluindo marcas preferidas)."""
         results = []
+        errors = []
+        blocked = 0
         queries = [
             "memoria ddr4 16gb",
             "memoria ram ddr4 16gb",
@@ -119,11 +143,22 @@ class AmazonScraper:
             for q in queries:
                 try:
                     url = f"https://www.amazon.com.br/s?k={q.replace(' ', '+')}"
-                    await page.goto(url, timeout=30000, wait_until="domcontentloaded")
+                    response = await page.goto(url, timeout=30000, wait_until="domcontentloaded")
+                    if response.status_code != 200:
+                        errors.append(f"HTTP {response.status_code}")
+                        if response.status_code in (401, 403, 429):
+                            blocked += 1
+                        continue
                     await page.wait_for_timeout(2500)
                     
                     cards = page.locator('div[data-component-type="s-search-result"]')
                     count = await cards.count()
+                    status, detail = await _classify_search_response(page, q, count)
+                    if status:
+                        errors.append(detail)
+                        if status == "blocked":
+                            blocked += 1
+                        continue
                     
                     for i in range(min(count, 35)):
                         card = cards.nth(i)
@@ -173,8 +208,10 @@ class AmazonScraper:
                             'category': 'RAM'
                         })
                 except Exception as e:
+                    errors.append(str(e))
                     logger.error(f"[Amazon RAM] Erro ao buscar {q}: {e}")
                     
             await browser.close()
-            
+
+        self.health['RAM'] = summarize_collection(len(results), errors, len(queries), blocked)
         return results

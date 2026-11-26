@@ -1,5 +1,8 @@
 import re
-from typing import Optional, Any, Dict
+import logging
+from typing import Optional, Any, Dict, List
+
+logger = logging.getLogger(__name__)
 
 def clean_price(price_input: Any) -> Optional[float]:
     """Converte diferentes formatos de preço (float, int ou string 'R$ 1.234,56') para float."""
@@ -31,6 +34,60 @@ def clean_price(price_input: Any) -> Optional[float]:
 def format_currency(value: float) -> str:
     """Formata valor em Real Brasileiro (BRL)"""
     return f"R$ {value:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+def summarize_collection(count: int, errors: List[str], attempted: int, blocked: int = 0) -> Dict[str, Any]:
+    if count > 0:
+        status = "partial" if errors or blocked else "ok"
+    elif blocked:
+        status = "blocked"
+    elif errors:
+        status = "error"
+    elif attempted == 0:
+        status = "not_collected"
+    else:
+        status = "empty"
+
+    detail = "; ".join(errors[:3])
+    if len(errors) > 3:
+        detail += f"; mais {len(errors) - 3} falha(s)"
+    return {"status": status, "count": count, "attempted": attempted, "detail": detail}
+
+def classify_search_page(body: str, result_count: int) -> tuple[str | None, str | None]:
+    if re.search(r'captcha|robot check|security verification|verificação de segurança|digite os caracteres', body, re.I):
+        return "blocked", "CAPTCHA ou verificação de segurança"
+    if result_count == 0 and not re.search(
+        r'não encontramos resultados|não há resultados|nenhum resultado|nenhum produto encontrado|'
+        r'não foram encontrados produtos|não encontramos produtos|no results|0\s+resultados?',
+        body,
+        re.I,
+    ):
+        return "error", "Estrutura de resultados ausente ou não reconhecida"
+    return None, None
+
+
+def get_native_ram_capacity(text: str) -> Optional[int]:
+    t = text.upper()
+    t = re.sub(
+        r'\b\d{1,2}\s*GB\s*(?:GDDR\d*|VRAM|DEDICADA|DE\s+MEM[OÓ]RIA\s+DE\s+V[IÍ]DEO)\b',
+        ' ',
+        t,
+    )
+    t = re.sub(r'\b(?:VRAM|DEDICADA)\s*(?:DE\s*)?\d{1,2}\s*GB\b', ' ', t)
+    capacities = {int(value) for value in re.findall(r'\b(8|16|32|64)\s*GB\b', t)}
+    for pattern, total in (
+        (r'\b1X\s*16\s*GB\b', 16),
+        (r'\b2X\s*8\s*GB\b', 16),
+        (r'\b1X\s*32\s*GB\b', 32),
+        (r'\b2X\s*16\s*GB\b', 32),
+        (r'\b4X\s*8\s*GB\b', 32),
+        (r'\b2X\s*32\s*GB\b', 64),
+    ):
+        if re.search(pattern, t):
+            capacities.add(total)
+    return max(capacities) if capacities else None
+
+def has_native_32gb_ram(text: str) -> bool:
+    return (get_native_ram_capacity(text) or 0) >= 32
 
 def is_nvidia_gpu(text: str) -> bool:
     """Verifica se a GPU do computador é da NVIDIA (GeForce, RTX, GTX, Quadro)."""
@@ -68,69 +125,92 @@ def get_ai_recommendation(gpu_name: str, vram: int) -> str:
         return "12GB VRAM: Perfeito p/ Ollama, Whisper Large v3, Embeddings e LLMs 7B/8B"
 
 def classify_pc_vram(title: str, description: str = "") -> Optional[str]:
-    """
-    Classifica a VRAM da GPU do PC em '8GB', '12GB' ou '16GB'.
-    - Categorias 12GB e 16GB: EXCLUSIVAMENTE NVIDIA (Foco em Servidores de IA / CUDA).
-    - Categoria 8GB: NVIDIA e AMD (Faixa econômica de entrada).
-    """
-    t = f"{title} {description}".upper()
-    
-    # Rejeita se for claramente peça avulsa (placa de vídeo avulsa, gabinete, periférico)
+    """Classifica a VRAM explicita ou conhecida da GPU em 8GB, 12GB ou 16GB."""
+    t = re.sub(r'\s+', ' ', f"{title} {description}".upper())
+
     if re.search(r'^(PLACA DE V[IÍ]DEO|PLACA DE VIDEO|GPU\b|PLACA GRAFICA)', t):
         return None
     if re.search(r'\b(GABINETE|FONTE|PLACA M[AÃ]E|COOLER|WATER COOLER|TECLADO|MOUSE|MONITOR|SUPORTE)\b', t):
         if not re.search(r'\b(PC GAMER|COMPUTADOR|DESKTOP|CPU GAMER)\b', t):
             return None
-            
-    # Deve ser um computador completo
     if not re.search(r'\b(PC GAMER|COMPUTADOR|DESKTOP|CPU GAMER)\b', t):
         return None
 
-    # Se a GPU for explicitamente de 2GB, 4GB ou 6GB (ex: RX 550, RX 560, GTX 1650, GTX 1050, GTX 1060, GTX 1660, RTX 3050 6GB), descarta
-    if re.search(r'\b(RX\s*550|RX\s*560|GTX\s*1650|GTX\s*1050|GTX\s*1060|GTX\s*1660|RTX\s*3050\s*6\s*GB|RTX\s*2060\s*6\s*GB|4\s*GB\s*DEDICADA|4\s*GB\s*VRAM|6\s*GB\s*VRAM|6\s*GB\s*DEDICADA)\b', t):
-        if not re.search(r'\b(RTX\s*(?:3060|3070|3080|40|50)|RX\s*(?:6600|7600|7650|7700|7800|90))\b', t):
-            return None
+    explicit_gpu = re.search(
+        r'\b(?:GEFORCE\s+)?(RTX|GTX|RX)\s*(\d{3,4})(?:\s*(TI|SUPER))?\s*(\d{1,2})\s*GB\b(?!\s*(?:DDR|RAM))',
+        t
+    )
+    if explicit_gpu:
+        capacity = int(explicit_gpu.group(4))
+        return f"{capacity}GB" if capacity in (8, 12, 16) else None
 
-    # 1. GPUs de 16GB VRAM (EXCLUSIVAMENTE NVIDIA - Servidor de IA / CUDA)
-    if is_nvidia_gpu(t):
-        if re.search(r'\b(RTX\s*5080|RTX\s*5070\s*TI|RTX\s*4090|RTX\s*4080|RTX\s*4070\s*TI\s*SUPER|RTX\s*3090)\b', t):
-            return '16GB'
-        if re.search(r'\b(RTX\s*4060\s*TI|RTX\s*5060\s*TI)\b', t) and re.search(r'\b16\s*GB\b(?!.*(?:DDR|RAM))', t):
-            return '16GB'
-        if re.search(r'\b16\s*GB\s*(?:VRAM|DEDICADA)\b', t):
-            return '16GB'
-        if re.search(r'(?:RTX|GEFORCE|QUADRO)\s+[A-Z0-9\s]+?\b16\s*GB\b(?!.*(?:DDR|RAM))', t):
-            return '16GB'
+    explicit_label = re.search(
+        r'\b(\d{1,2})\s*GB\s*(?:VRAM|DEDICADA)\b|\b(?:VRAM|DEDICADA)\s*(?:DE\s*)?(\d{1,2})\s*GB\b',
+        t
+    )
+    if explicit_label:
+        capacity = int(explicit_label.group(1) or explicit_label.group(2))
+        return f"{capacity}GB" if capacity in (8, 12, 16) else None
 
-    # 2. GPUs de 12GB VRAM (EXCLUSIVAMENTE NVIDIA - Servidor de IA / CUDA)
-    if is_nvidia_gpu(t):
-        if re.search(r'\b(RTX\s*5070(?!\s*TI)|RTX\s*4070\s*TI(?!\s*SUPER)|RTX\s*4070\s*SUPER|RTX\s*4070(?!\s*TI)|RTX\s*3080\s*TI|RTX\s*3080\s*12\s*GB)\b', t):
-            return '12GB'
-        if re.search(r'\bRTX\s*3060\b', t) and not re.search(r'\bRTX\s*3060\s*8\s*GB\b', t):
-            return '12GB'
-        if re.search(r'\b12\s*GB\s*(?:VRAM|DEDICADA)\b', t):
-            return '12GB'
-        if re.search(r'(?:RTX|GEFORCE)\s+[A-Z0-9\s]+?\b12\s*GB\b(?!.*(?:DDR|RAM))', t):
-            return '12GB'
+    model = re.search(r'\b(RTX|GTX|RX)\s*(\d{3,4})(?:\s*(TI|SUPER))?\b', t)
+    if not model:
+        return None
 
-    # 3. GPUs de 8GB VRAM (NVIDIA e AMD - Categoria de Entrada Econômica)
-    if re.search(r'\b(RTX\s*5060(?!\s*TI\s*16)|RTX\s*5050|RTX\s*4060(?!\s*TI\s*16)|RTX\s*3070|RTX\s*3060\s*8\s*GB|RTX\s*3050|RTX\s*2070|RTX\s*2060\s*SUPER|RX\s*9050|RX\s*7650|RX\s*7600(?!\s*XT)|RX\s*6650|RX\s*6600|RX\s*580|RX\s*590|RX\s*570|ARC\s*A580|ARC\s*A750)\b', t):
-        if re.search(r'\bRTX\s*3050\s*6\s*GB\b', t) or (re.search(r'\bRTX\s*3050\b', t) and re.search(r'\b6\s*GB\b', t)):
-            return None
-        return '8GB'
-    if re.search(r'\b8\s*GB\s*(?:VRAM|DEDICADA)\b', t):
-        return '8GB'
-    if re.search(r'(?:RTX|RX|RADEON|GEFORCE|ARC)\s+[A-Z0-9\s]+?\b8\s*GB\b(?!.*(?:DDR|RAM))', t):
-        return '8GB'
+    family, number, suffix = model.groups()
+    suffix = suffix or ""
+    defaults = {
+        ("RTX", "3050", ""): "8GB",
+        ("RTX", "3060", ""): "12GB",
+        ("RTX", "3070", ""): "8GB",
+        ("RTX", "3080", "TI"): "12GB",
+        ("RTX", "4060", ""): "8GB",
+        ("RTX", "4070", ""): "12GB",
+        ("RTX", "4070", "TI"): "12GB",
+        ("RTX", "4070", "SUPER"): "12GB",
+        ("RTX", "4080", ""): "16GB",
+        ("RTX", "5050", ""): "8GB",
+        ("RTX", "5060", ""): "8GB",
+        ("RTX", "5070", ""): "12GB",
+        ("RTX", "5070", "TI"): "16GB",
+        ("RTX", "5080", ""): "16GB",
+        ("GTX", "1650", ""): "4GB",
+        ("GTX", "1660", ""): "6GB",
+        ("GTX", "2060", "SUPER"): "8GB",
+        ("RX", "6600", ""): "8GB",
+        ("RX", "6650", ""): "8GB",
+        ("RX", "6650", "XT"): "8GB",
+        ("RX", "7600", ""): "8GB",
+        ("RX", "7600", "XT"): "8GB",
+        ("RX", "7650", ""): "8GB",
+        ("RX", "7700", ""): "8GB",
+        ("RX", "7700", "XT"): "8GB",
+        ("RX", "7800", ""): "8GB",
+        ("RX", "7800", "XT"): "8GB",
+        ("RX", "9050", ""): "8GB",
+    }
+    return defaults.get((family, number, suffix))
 
-    return None
+def _is_complete_pc_title(title: str) -> bool:
+    product_text = re.sub(
+        r'\b(?:PARA|COMPAT[IÍ]VEL\s+COM)\s+(?:PCS?|COMPUTADOR(?:ES)?(?:\s+DESKTOP)?|DESKTOPS?)\b',
+        ' ',
+        title,
+    )
+    return bool(re.search(
+        r'\b(PC|COMPUTADOR(?:ES)?|DESKTOP|CPU\s+GAMER|ALL\s+IN\s+ONE)\b',
+        product_text,
+    ))
+
 
 def classify_ssd_capacity(title: str) -> Optional[str]:
-    """Classifica SSD em '512GB' ou '1TB', ignorando cases, gavetas e adaptadores."""
+    """Classifica a capacidade do SSD sem aceitar acessorios ou variantes ambiguas."""
     t = title.upper()
-    
+
+    if _is_complete_pc_title(t):
+        return None
+
     # Exclui acessórios (cases, cabos, gavetas, adaptadores, capas) e discos rígidos mecânicos (HDs)
-    if re.search(r'\b(CASE|GAVETA|ADAPTADOR|DOCK|CABO|DISSIPADOR|ENCLOSURE|CAPA|BOLSA|ESTOJO)\b', t):
+    if re.search(r'\b(CASE|GAVETA|ADAPTADOR|DOCK|CABO|DISSIPADOR|ENCLOSURE|CAPA|BOLSA|ESTOJO|MAIXA|TRANSPORTE|R[IÍ]GIDA|SACO)\b', t):
         return None
     if re.search(r'\b(RPM|DISCO R[ÍI]GIDO|HD INTERNO|HDD)\b', t) and not re.search(r'\bSSD\b', t):
         return None
@@ -138,25 +218,32 @@ def classify_ssd_capacity(title: str) -> Optional[str]:
     # Confirma que é SSD
     if not re.search(r'\b(SSD|NVME|M\.2)\b', t):
         return None
-    
-    # 2TB (inclui 2TB, 2000GB, 2048GB, 2000G, 2TB)
-    if re.search(r'\b(2\s*TB|2000\s*G(?:B)?|2048\s*G(?:B)?)\b', t):
-        return '2TB'
 
-    # 1TB (inclui 960GB, 1000GB, 1TB, 1024GB, 960G, 1000G)
-    if re.search(r'\b(1\s*TB|960\s*G(?:B)?|1000\s*G(?:B)?|1024\s*G(?:B)?)\b', t):
-        return '1TB'
+    variant = re.search(r'\((1|2)(?:\s*,)?\s*TB\)', t)
+    if variant:
+        return f"{variant.group(1)}TB"
+    
+    capacities = set()
+    patterns = {
+        '2TB': r'\b(2\s*TB|2000\s*G(?:B)?|2048\s*G(?:B)?)\b',
+        '1TB': r'\b(1\s*TB|960\s*G(?:B)?|1000\s*G(?:B)?|1024\s*G(?:B)?)\b',
+        '512GB': r'\b(512\s*G(?:B)?|500\s*G(?:B)?|480\s*G(?:B)?)\b',
+    }
+    for capacity, pattern in patterns.items():
+        if re.search(pattern, t):
+            capacities.add(capacity)
+
+    return next(iter(capacities)) if len(capacities) == 1 else None
+
         
-    # 512GB (inclui 480GB, 500GB, 512GB, 480G, 500G, 512G)
-    if re.search(r'\b(512\s*G(?:B)?|500\s*G(?:B)?|480\s*G(?:B)?)\b', t):
-        return '512GB'
         
-    return None
 
 def is_nvme_ssd(title: str) -> bool:
-    """Verifica se o SSD é do tipo NVMe / M.2 PCIe."""
+    """Verifica se o SSD e NVMe sem tratar M.2 SATA como PCIe."""
     t = title.upper()
-    return bool(re.search(r'\b(NVME|PCIE|GEN[345]|M\.2|M2|SN580|NV3|NV2|P3|P3\s*PLUS|NM620|NM790|LEGEND|REAPER|GAMMIX|FURY\s*RENEGADE)\b', t))
+    if re.search(r'\bSATA\b', t) and not re.search(r'\b(NVME|PCIE)\b', t):
+        return False
+    return bool(re.search(r'\b(NVME|PCIE|GEN[345]|SN580|NV3|NV2|P3|P3\s*PLUS|NM620|NM790|LEGEND|REAPER|GAMMIX|FURY\s*RENEGADE)\b', t))
 
 def is_preferred_nvme_model(title: str) -> bool:
     """Verifica se é um modelo NVMe de destaque custo-benefício (Kingston NV3, WD Blue SN580, Crucial P3 Plus)."""
@@ -194,7 +281,10 @@ def is_valid_ram_16gb_ddr4(title: str) -> bool:
     Rejeita: SODIMM (notebook), DDR3, DDR5, pentes avulsos de 8GB e acessórios.
     """
     t = title.upper()
-    
+
+    if _is_complete_pc_title(t):
+        return False
+
     # 1. Rejeita se for para Notebook / SODIMM / Servidor
     if re.search(r'\b(SODIMM|SO-DIMM|NOTEBOOK|LAPTOP|MACBOOK|ECC|RDIMM|LRDIMM|REGISTRADA|POWEREDGE|PROLIANT|SERVER|SERVIDOR)\b', t):
         return False
@@ -213,18 +303,7 @@ def is_valid_ram_16gb_ddr4(title: str) -> bool:
     if re.search(r'^(DISSIPADOR|COOLER|CABO|ADAPTADOR|GAVETA|CASE)\b', t) or re.search(r'\b(DISSIPADOR\s+PARA|COOLER\s+PARA)\b', t):
         return False
         
-    # 5. Deve ser 16GB (1x16GB ou kit 2x8GB)
-    has_16gb = bool(re.search(r'\b16\s*GB\b', t) or re.search(r'\b1X16\s*GB\b', t) or re.search(r'\b1X16GB\b', t))
-    has_2x8gb = bool(re.search(r'\b2\s*X\s*8\s*GB\b', t) or re.search(r'\(2X8GB\)', t) or re.search(r'\b2X8GB\b', t))
-    
-    if not (has_16gb or has_2x8gb):
-        return False
-        
-    # 6. Rejeita se tiver 32GB ou 64GB e não for 16GB
-    if re.search(r'\b(32|64)\s*GB\b', t) and not (has_16gb or has_2x8gb):
-        return False
-
-    return True
+    return get_native_ram_capacity(t) == 16
 
 def analyze_pc_ram_upgrade(title: str, text: str = "", price: float = 0.0) -> Dict[str, Any]:
     """
@@ -326,6 +405,8 @@ def check_pichau_bundle_32gb_options(url: str, base_price: float = 0.0) -> Dict[
     from curl_cffi import requests as cffi_requests
     
     res = {
+        "status": "error",
+        "detail": "",
         "site_customization_available": False,
         "site_option_title": "",
         "site_diff_price": 0.0,
@@ -343,10 +424,18 @@ def check_pichau_bundle_32gb_options(url: str, base_price: float = 0.0) -> Dict[
         }
         r_get = session.get(url, headers=get_headers, timeout=12)
         if r_get.status_code != 200:
+            res["status"] = "http_error"
+            res["detail"] = f"GET HTTP {r_get.status_code}"
+            res["site_status_label"] = "Configurador 32GB indisponível no site"
+            logger.warning(f"[Pichau] Configurador 32GB: GET HTTP {r_get.status_code}")
             return res
-            
+
         m_sku = re.search(r'\b(PCM-[A-Za-z0-9_-]+)\b', r_get.text)
         if not m_sku:
+            res["status"] = "sku_not_found"
+            res["detail"] = "SKU PCM não encontrado"
+            res["site_status_label"] = "Configurador 32GB indisponível no site"
+            logger.warning("[Pichau] Configurador 32GB: SKU PCM não encontrado")
             return res
         sku = m_sku.group(1)
         
@@ -362,50 +451,77 @@ def check_pichau_bundle_32gb_options(url: str, base_price: float = 0.0) -> Dict[
             "sec-fetch-site": "same-origin"
         }
         r_post = session.post(url, headers=post_headers, data=json.dumps([sku]), timeout=12)
-        if r_post.status_code == 200:
-            for line in r_post.text.split("\n"):
-                if line.startswith("1:"):
-                    data = json.loads(line[2:])
-                    for opt in data.get("options", []):
-                        if opt.get("title") == "Memória":
-                            def_item = next((v for v in opt.get("value", []) if v.get("is_default")), None)
-                            def_price = float(def_item.get("price", 0)) if def_item else 0.0
-                            
-                            in_stock_32gb = []
-                            all_32gb = []
-                            for val in opt.get("value", []):
-                                val_title = val.get("title") or val.get("product", {}).get("name", "")
-                                val_stock = val.get("product", {}).get("stock_status")
-                                val_price = float(val.get("price", 0))
-                                
-                                if "32GB" in val_title.upper() or "32 GB" in val_title.upper():
-                                    diff = val_price - def_price
-                                    item_data = {"title": val_title, "stock": val_stock, "diff": diff}
-                                    all_32gb.append(item_data)
-                                    if val_stock == "IN_STOCK":
-                                        in_stock_32gb.append(item_data)
-                                        
-                            if in_stock_32gb:
-                                best = in_stock_32gb[0]
-                                diff_val = round(best["diff"], 2)
-                                res["site_customization_available"] = True
-                                res["site_option_title"] = best["title"]
-                                res["site_diff_price"] = diff_val
-                                res["site_assembled_total"] = round(base_price + diff_val, 2)
-                                res["site_status_label"] = f"🟢 Disponível no Site (+R$ {diff_val:,.2f})"
-                                res["site_badge_bg"] = "#dcfce7"
-                                res["site_badge_color"] = "#15803d"
-                            elif all_32gb:
-                                res["site_status_label"] = "🔴 32GB Esgotado no Site"
-                                res["site_badge_bg"] = "#fee2e2"
-                                res["site_badge_color"] = "#991b1b"
-                            else:
-                                res["site_status_label"] = "⚪ Sem opção 32GB no site"
-                                res["site_badge_bg"] = "#f1f5f9"
-                                res["site_badge_color"] = "#475569"
-    except Exception:
-        pass
-        
+        if r_post.status_code == 409:
+            res["status"] = "action_unavailable"
+            res["detail"] = "POST HTTP 409: Server Action unavailable"
+            res["site_status_label"] = "Configurador 32GB indisponível no site"
+            logger.warning("[Pichau] Configurador 32GB: Server Action indisponível (HTTP 409)")
+            return res
+        if r_post.status_code != 200:
+            res["status"] = "http_error"
+            res["detail"] = f"POST HTTP {r_post.status_code}"
+            res["site_status_label"] = "Configurador 32GB indisponível no site"
+            logger.warning(f"[Pichau] Configurador 32GB: POST HTTP {r_post.status_code}")
+            return res
+        res["status"] = "parse_error"
+        res["detail"] = "Resposta do configurador não reconhecida"
+        recognized_payload = False
+        for line in r_post.text.split("\n"):
+            if line.startswith("1:"):
+                data = json.loads(line[2:])
+                recognized_payload = True
+                for opt in data.get("options", []):
+                    if opt.get("title") == "Memória":
+                        def_item = next((v for v in opt.get("value", []) if v.get("is_default")), None)
+                        def_price = float(def_item.get("price", 0)) if def_item else 0.0
+
+                        in_stock_32gb = []
+                        all_32gb = []
+                        for val in opt.get("value", []):
+                            val_title = val.get("title") or val.get("product", {}).get("name", "")
+                            val_stock = val.get("product", {}).get("stock_status")
+                            val_price = float(val.get("price", 0))
+
+                            if "32GB" in val_title.upper() or "32 GB" in val_title.upper():
+                                diff = val_price - def_price
+                                item_data = {"title": val_title, "stock": val_stock, "diff": diff}
+                                all_32gb.append(item_data)
+                                if val_stock == "IN_STOCK":
+                                    in_stock_32gb.append(item_data)
+
+                        if in_stock_32gb:
+                            best = in_stock_32gb[0]
+                            diff_val = round(best["diff"], 2)
+                            res["site_customization_available"] = True
+                            res["site_option_title"] = best["title"]
+                            res["site_diff_price"] = diff_val
+                            res["site_assembled_total"] = round(base_price + diff_val, 2)
+                            res["site_status_label"] = f"🟢 Disponível no Site (+R$ {diff_val:,.2f})"
+                            res["site_badge_bg"] = "#dcfce7"
+                            res["site_badge_color"] = "#15803d"
+                        elif all_32gb:
+                            res["site_status_label"] = "🔴 32GB Esgotado no Site"
+                            res["site_badge_bg"] = "#fee2e2"
+                            res["site_badge_color"] = "#991b1b"
+                        else:
+                            res["site_status_label"] = "⚪ Sem opção 32GB no site"
+                            res["site_badge_bg"] = "#f1f5f9"
+                            res["site_badge_color"] = "#475569"
+        if not recognized_payload:
+            logger.warning("[Pichau] Configurador 32GB: resposta sem payload reconhecido")
+            return res
+        res["status"] = "ok"
+    except json.JSONDecodeError as e:
+        res["status"] = "parse_error"
+        res["detail"] = f"JSON inválido: {e}"
+        res["site_status_label"] = "Configurador 32GB indisponível no site"
+        logger.warning(f"[Pichau] JSON inválido no configurador 32GB: {e}")
+    except Exception as e:
+        res["status"] = "error"
+        res["detail"] = str(e)
+        res["site_status_label"] = "Configurador 32GB indisponível no site"
+        logger.warning(f"[Pichau] Erro ao consultar configurador 32GB: {e}")
+
     return res
 
 

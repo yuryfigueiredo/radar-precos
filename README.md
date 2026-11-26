@@ -1,22 +1,21 @@
-# ⚡ Radar de Preços: PCs Montados, SSDs e Memórias RAM 16GB DDR4 Gamer
+# ⚡ Radar de Preços: SSDs e Memórias RAM 16GB DDR4 Gamer
 
-Automação 100% em nuvem que monitora os menores preços de computadores gamer prontos (com garantia), SSDs e memórias RAM gamer, enviando um resumo formatado para o seu e-mail **sem precisar estar com o computador ligado**.
+Automação executada pelo GitHub Actions no seu PC Windows com runner self-hosted. Ela monitora os menores preços de SSDs e memórias RAM 16GB DDR4 gamer e envia um resumo formatado para o seu e-mail; para rodar sem acompanhamento, o PC e o runner precisam estar ligados, conectados à internet e disponíveis.
 
 ---
 
 ## 🎯 O que este robô monitora?
 
-1. **Computadores Montados e Prontos (com garantia):**
-   - Placa de Vídeo de **8 GB** mais baratos *(Pichau, Terabyte, Kabum)*
-   - Placa de Vídeo de **12 GB** mais baratos *(Pichau, Terabyte, Kabum)*
-   - Placa de Vídeo de **16 GB** mais baratos *(Pichau, Terabyte, Kabum)*
-
-2. **Memórias RAM Gamer:**
+1. **Memórias RAM Gamer:**
    - Memórias RAM **16GB DDR4 Gamer** (Desktop) mais baratas *(Kabum, Terabyte, Pichau, Amazon, Mercado Livre)*
+   - Destaque fixo para **Mancer Dantalion 16GB DDR4 3200MHz CL19**
+   - Seleção de marcas preferidas: **Kingston Fury Beast, XPG Gammix D35, Corsair Vengeance LPX e Crucial**
 
-3. **Peças / SSDs:**
-   - SSDs de **512 GB** (e 480GB/500GB) mais baratos *(Pichau, Terabyte, Kabum, Amazon, Mercado Livre)*
-   - SSDs de **1 TB** (e 960GB/1000GB) mais baratos *(Pichau, Terabyte, Kabum, Amazon, Mercado Livre)*
+2. **SSDs:**
+   - SSDs de **512 GB** (e 480GB/500GB) mais baratos *(Kabum, Terabyte, Pichau, Amazon, Mercado Livre)*
+   - SSDs de **1 TB** (e 960GB/1000GB) mais baratos *(Kabum, Terabyte, Pichau, Amazon, Mercado Livre)*
+   - SSDs de **2 TB** (e 1,92TB/2000GB) mais baratos *(Kabum, Terabyte, Pichau, Amazon, Mercado Livre)*
+   - Destaques NVMe de 1TB e 2TB: **Kingston NV3, WD Blue SN580 e Crucial P3 Plus**
 
 ---
 
@@ -25,9 +24,9 @@ Automação 100% em nuvem que monitora os menores preços de computadores gamer 
 
 ---
 
-## 🚀 Como funciona 24/7 na Nuvem (GitHub Actions)
+## 🚀 Como funciona com o runner do seu PC (GitHub Actions)
 
-O projeto usa o **GitHub Actions** (gratuito). O GitHub "acorda" nos horários programados (ex: 08:00 e 18:00), roda o script em Python, extrai os menores preços, formata o e-mail em HTML e envia para a sua caixa de entrada.
+O projeto usa o **GitHub Actions** para disparar a automação nos horários programados (08:00 e 18:00, horário de Brasília) ou pelo botão **Run workflow**. A coleta e o envio do e-mail acontecem no **PC Windows cadastrado como runner self-hosted**, usando a conexão residencial. Se o PC ou o runner estiver desligado, a execução programada pode atrasar ou não ocorrer.
 
 ---
 
@@ -47,7 +46,7 @@ No terminal da pasta do projeto (`C:\Users\Yury\Documents\Projetos Yury\Automaç
 ```bash
 git init
 git add .
-git commit -m "Radar de precos PCs SSDs e Memoria RAM DDR4"
+git commit -m "Radar de precos SSDs e Memoria RAM DDR4"
 git branch -M main
 # Substitua com a URL do seu repositório privado no GitHub:
 git remote add origin https://github.com/SEU_USUARIO/radar-precos.git

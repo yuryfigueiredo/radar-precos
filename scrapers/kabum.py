@@ -3,7 +3,7 @@ import logging
 import requests
 from bs4 import BeautifulSoup
 from typing import List, Dict, Any
-from .utils import clean_price, classify_pc_vram, classify_ssd_capacity, is_valid_ram_16gb_ddr4
+from .utils import clean_price, classify_pc_vram, classify_ssd_capacity, is_valid_ram_16gb_ddr4, summarize_collection
 
 logger = logging.getLogger(__name__)
 
@@ -16,16 +16,17 @@ class KabumScraper:
     def __init__(self):
         self.session = requests.Session()
         self.session.headers.update(HEADERS)
+        self.health = {}
 
     def _fetch_next_data(self, url: str) -> List[Dict[str, Any]]:
         try:
             r = self.session.get(url, timeout=20)
             if r.status_code != 200:
-                return []
+                raise RuntimeError(f"HTTP {r.status_code}")
             soup = BeautifulSoup(r.text, 'html.parser')
             script = soup.find('script', id='__NEXT_DATA__')
             if not script or not script.string:
-                return []
+                raise RuntimeError("__NEXT_DATA__ ausente")
             d = json.loads(script.string)
             data_raw = d.get('props', {}).get('pageProps', {}).get('data', '{}')
             if isinstance(data_raw, str):
@@ -35,12 +36,14 @@ class KabumScraper:
             return catalog.get('catalogServer', {}).get('data', [])
         except Exception as e:
             logger.error(f"[Kabum] Erro na busca: {e}")
-            return []
+            raise
 
     def get_gaming_pcs(self) -> List[Dict[str, Any]]:
         """Busca computadores gamers prontos na Kabum."""
         results = []
         seen_codes = set()
+        errors = []
+        blocked = 0
         queries = [
             ("computador gamer rx 6600", True),
             ("computador gamer rtx 4060", True),
@@ -59,7 +62,14 @@ class KabumScraper:
                 url = f"https://www.kabum.com.br/busca/{q.replace(' ', '-')}?page_number=1&page_size=30&sort=price&direction=asc"
             else:
                 url = f"https://www.kabum.com.br/busca/{q.replace(' ', '-')}?page_number=1&page_size=30"
-            items = self._fetch_next_data(url)
+            try:
+                items = self._fetch_next_data(url)
+            except Exception as e:
+                error = str(e)
+                errors.append(error)
+                if any(code in error for code in ("HTTP 401", "HTTP 403", "HTTP 429")):
+                    blocked += 1
+                continue
             for item in items:
                 code = item.get('code')
                 if not code or code in seen_codes:
@@ -85,12 +95,15 @@ class KabumScraper:
                     'link': f"https://www.kabum.com.br/produto/{code}",
                     'category': 'PC'
                 })
+        self.health['PC'] = summarize_collection(len(results), errors, len(queries), blocked)
         return results
 
     def get_ssds(self) -> List[Dict[str, Any]]:
         """Busca SSDs de 512GB, 1TB e 2TB (incluindo NVMe de referência) na Kabum."""
         results = []
         seen_codes = set()
+        errors = []
+        blocked = 0
         queries = [
             "ssd 512gb",
             "ssd 1tb",
@@ -104,7 +117,14 @@ class KabumScraper:
         
         for q in queries:
             url = f"https://www.kabum.com.br/busca/{q.replace(' ', '-')}?page_number=1&page_size=30&sort=price&direction=asc"
-            items = self._fetch_next_data(url)
+            try:
+                items = self._fetch_next_data(url)
+            except Exception as e:
+                error = str(e)
+                errors.append(error)
+                if any(code in error for code in ("HTTP 401", "HTTP 403", "HTTP 429")):
+                    blocked += 1
+                continue
             for item in items:
                 code = item.get('code')
                 if not code or code in seen_codes:
@@ -129,12 +149,15 @@ class KabumScraper:
                     'link': f"https://www.kabum.com.br/produto/{code}",
                     'category': 'SSD'
                 })
+        self.health['SSD'] = summarize_collection(len(results), errors, len(queries), blocked)
         return results
 
     def get_ram_16gb_ddr4(self) -> List[Dict[str, Any]]:
         """Busca memórias RAM 16GB DDR4 na Kabum (gerais e marcas preferidas)."""
         results = []
         seen_codes = set()
+        errors = []
+        blocked = 0
         queries = [
             "memoria ram 16gb ddr4",
             "memoria 16gb ddr4",
@@ -146,7 +169,14 @@ class KabumScraper:
         
         for q in queries:
             url = f"https://www.kabum.com.br/busca/{q.replace(' ', '-')}?page_number=1&page_size=30&sort=price&direction=asc"
-            items = self._fetch_next_data(url)
+            try:
+                items = self._fetch_next_data(url)
+            except Exception as e:
+                error = str(e)
+                errors.append(error)
+                if any(code in error for code in ("HTTP 401", "HTTP 403", "HTTP 429")):
+                    blocked += 1
+                continue
             for item in items:
                 code = item.get('code')
                 if not code or code in seen_codes:
@@ -169,4 +199,5 @@ class KabumScraper:
                     'link': f"https://www.kabum.com.br/produto/{code}",
                     'category': 'RAM'
                 })
+        self.health['RAM'] = summarize_collection(len(results), errors, len(queries), blocked)
         return results

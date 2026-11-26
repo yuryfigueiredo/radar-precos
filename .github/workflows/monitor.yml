@@ -10,10 +10,15 @@ on:
     - cron: '0 21 * * *'
   workflow_dispatch: # Permite disparar manualmente pelo botão "Run workflow" no GitHub
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   run-price-radar:
     # Executa no runner local (IP brasileiro residencial para evitar bloqueios Cloudflare da Pichau)
     runs-on: [self-hosted, windows]
+    timeout-minutes: 20
 
     steps:
       - name: Checkout do Repositório
@@ -25,6 +30,9 @@ jobs:
           pip install -r requirements.txt
           playwright install chromium
 
+      - name: Executar Testes do Radar
+        run: python -m unittest discover -s tests -v
+
       - name: Restaurar Histórico de Preços
         uses: actions/cache@v4
         with:
@@ -32,6 +40,7 @@ jobs:
           key: price-history-${{ github.run_id }}
           restore-keys: |
             price-history-
+          enableCrossOsArchive: true
 
       - name: Executar Radar de Preços e Disparar E-mail
         env:
@@ -42,6 +51,13 @@ jobs:
           SMTP_PORT: ${{ secrets.SMTP_PORT || '465' }}
         run: |
           python main.py
+
+      - name: Persistir Histórico de Preços
+        if: success()
+        uses: actions/cache/save@v4
+        with:
+          path: historico_precos.json
+          key: price-history-${{ github.run_id }}
 
       - name: Salvar Relatório HTML gerado
         if: always()

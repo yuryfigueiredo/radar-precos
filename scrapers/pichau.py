@@ -5,7 +5,7 @@ from typing import List, Dict, Any
 from bs4 import BeautifulSoup
 from curl_cffi import requests
 from playwright.async_api import async_playwright
-from .utils import clean_price, classify_pc_vram, classify_ssd_capacity, is_valid_ram_16gb_ddr4
+from .utils import clean_price, classify_pc_vram, classify_search_page, classify_ssd_capacity, is_valid_ram_16gb_ddr4, summarize_collection
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +18,7 @@ class PichauScraper:
             "sec-ch-ua-mobile": "?0",
             "sec-ch-ua-platform": '"Windows"',
         }
+        self.health = {}
 
     def _get_session(self) -> requests.Session:
         return requests.Session(impersonate="chrome124")
@@ -28,6 +29,8 @@ class PichauScraper:
     def _fetch_pcs_sync(self) -> List[Dict[str, Any]]:
         results = []
         seen_links = set()
+        errors = []
+        blocked = 0
         urls = [
             "https://www.pichau.com.br/computadores/pichau-gamer?rgpu=6359&sort=price-asc",
             "https://www.pichau.com.br/computadores/pichau-gamer?rgpu=611&sort=price-asc",
@@ -39,6 +42,10 @@ class PichauScraper:
             try:
                 resp = s.get(url, headers=self.headers, timeout=20)
                 if resp.status_code != 200:
+                    error = f"HTTP {resp.status_code}"
+                    errors.append(error)
+                    if resp.status_code in (401, 403, 429):
+                        blocked += 1
                     logger.warning(f"[Pichau PC] Status {resp.status_code} ao buscar {url}")
                     continue
                     
@@ -100,8 +107,10 @@ class PichauScraper:
                         'category': 'PC'
                     })
             except Exception as e:
+                errors.append(str(e))
                 logger.warning(f"[Pichau PC] Erro ao buscar {url}: {e}")
-                
+
+        self.health['PC'] = summarize_collection(len(results), errors, len(urls), blocked)
         return results
 
     async def get_gaming_pcs(self) -> List[Dict[str, Any]]:
@@ -119,12 +128,17 @@ class PichauScraper:
     async def _get_gaming_pcs_playwright(self) -> List[Dict[str, Any]]:
         results = []
         seen_links = set()
+        previous = self.health.get('PC', {})
+        errors = [previous['detail']] if previous.get('detail') else []
+        blocked = 1 if previous.get('status') == 'blocked' else 0
+        attempted = previous.get('attempted', 0)
         urls = [
             "https://www.pichau.com.br/computadores/pichau-gamer?rgpu=6359&sort=price-asc",
             "https://www.pichau.com.br/computadores/pichau-gamer",
         ]
         async with async_playwright() as p:
             for url in urls:
+                attempted += 1
                 try:
                     browser = await p.chromium.launch(
                         headless=True,
@@ -135,7 +149,13 @@ class PichauScraper:
                         locale="pt-BR"
                     )
                     page = await context.new_page()
-                    await page.goto(url, timeout=30000, wait_until="domcontentloaded")
+                    response = await page.goto(url, timeout=30000, wait_until="domcontentloaded")
+                    if response.status_code != 200:
+                        errors.append(f"HTTP {response.status_code}")
+                        if response.status_code in (401, 403, 429):
+                            blocked += 1
+                        await browser.close()
+                        continue
                     await page.wait_for_timeout(4000)
                     
                     cards = page.locator('a[data-cy*="product"], a[href*="/pc-gamer-"], a[href*="/computador-"]')
@@ -184,7 +204,9 @@ class PichauScraper:
                     await browser.close()
                     await asyncio.sleep(2)
                 except Exception as e:
+                    errors.append(str(e))
                     logger.warning(f"[Pichau Playwright Fallback] Erro: {e}")
+        self.health['PC'] = summarize_collection(len(results), errors, attempted, blocked)
         return results
 
     # -------------------------------------------------------------
@@ -193,6 +215,8 @@ class PichauScraper:
     def _fetch_ssds_sync(self) -> List[Dict[str, Any]]:
         results = []
         seen_links = set()
+        errors = []
+        blocked = 0
         urls = [
             "https://www.pichau.com.br/hardware/ssd?sort=price-asc",
             "https://www.pichau.com.br/search?q=ssd+512gb",
@@ -207,9 +231,18 @@ class PichauScraper:
             try:
                 resp = s.get(url, headers=self.headers, timeout=20)
                 if resp.status_code != 200:
+                    errors.append(f"HTTP {resp.status_code}")
+                    if resp.status_code in (401, 403, 429):
+                        blocked += 1
                     continue
                 soup = BeautifulSoup(resp.text, "html.parser")
                 cards = soup.select('a[href*="/ssd-"], a[data-cy*="product"]')
+                status, detail = classify_search_page(soup.get_text(" ", strip=True), len(cards))
+                if status:
+                    errors.append(f"{url}: {detail}")
+                    if status == "blocked":
+                        blocked += 1
+                    continue
                 for card in cards:
                     href = card.get('href')
                     if not href or href.endswith('/hardware/ssd'):
@@ -258,7 +291,9 @@ class PichauScraper:
                         'category': 'SSD'
                     })
             except Exception as e:
+                errors.append(str(e))
                 logger.warning(f"[Pichau SSD] Erro em {url}: {e}")
+        self.health['SSD'] = summarize_collection(len(results), errors, len(urls), blocked)
         return results
 
     async def get_ssds(self) -> List[Dict[str, Any]]:
@@ -270,6 +305,8 @@ class PichauScraper:
     def _fetch_rams_sync(self) -> List[Dict[str, Any]]:
         results = []
         seen_links = set()
+        errors = []
+        blocked = 0
         urls = [
             "https://www.pichau.com.br/memoria-mancer-dantalion-16gb-1x16gb-ddr4-3200mhz-cl19-preta-e-branca-mcr-dtl3200-16gb",
             "https://www.pichau.com.br/search?q=memoria+ddr4+16gb&sort=price-asc",
@@ -285,6 +322,9 @@ class PichauScraper:
             try:
                 resp = s.get(url, headers=self.headers, timeout=20)
                 if resp.status_code != 200:
+                    errors.append(f"HTTP {resp.status_code}")
+                    if resp.status_code in (401, 403, 429):
+                        blocked += 1
                     continue
                 soup = BeautifulSoup(resp.text, "html.parser")
                 
@@ -313,6 +353,12 @@ class PichauScraper:
                     continue
 
                 cards = soup.select('a[href*="/memoria-"], a[data-cy*="product"]')
+                status, detail = classify_search_page(soup.get_text(" ", strip=True), len(cards))
+                if status:
+                    errors.append(f"{url}: {detail}")
+                    if status == "blocked":
+                        blocked += 1
+                    continue
                 for card in cards:
                     href = card.get('href')
                     if not href or href.endswith('/hardware/memorias'):
@@ -359,7 +405,9 @@ class PichauScraper:
                         'category': 'RAM'
                     })
             except Exception as e:
+                errors.append(str(e))
                 logger.warning(f"[Pichau RAM] Erro em {url}: {e}")
+        self.health['RAM'] = summarize_collection(len(results), errors, len(urls), blocked)
         return results
 
     async def get_ram_16gb_ddr4(self) -> List[Dict[str, Any]]:
