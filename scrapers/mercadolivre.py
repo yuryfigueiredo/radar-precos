@@ -35,12 +35,12 @@ class MercadoLivreScraper:
                     response = await page.goto(url, timeout=12000, wait_until="domcontentloaded")
                     await page.wait_for_timeout(2000)
 
-                    if response.status_code in (401, 403, 429):
-                        errors.append(f"HTTP {response.status_code}")
+                    if response.status in (401, 403, 429):
+                        errors.append(f"HTTP {response.status}")
                         blocked += 1
                         continue
-                    if response.status_code != 200:
-                        errors.append(f"HTTP {response.status_code}")
+                    if response.status != 200:
+                        errors.append(f"HTTP {response.status}")
                         continue
 
                     if "account-verification" in page.url:
@@ -139,12 +139,12 @@ class MercadoLivreScraper:
                     response = await page.goto(url, timeout=12000, wait_until="domcontentloaded")
                     await page.wait_for_timeout(2000)
 
-                    if response.status_code in (401, 403, 429):
-                        errors.append(f"HTTP {response.status_code}")
+                    if response.status in (401, 403, 429):
+                        errors.append(f"HTTP {response.status}")
                         blocked += 1
                         continue
-                    if response.status_code != 200:
-                        errors.append(f"HTTP {response.status_code}")
+                    if response.status != 200:
+                        errors.append(f"HTTP {response.status}")
                         continue
 
                     if "account-verification" in page.url:

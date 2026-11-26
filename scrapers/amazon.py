@@ -37,9 +37,9 @@ class AmazonScraper:
                 try:
                     url = f"https://www.amazon.com.br/s?k={q.replace(' ', '+')}"
                     response = await page.goto(url, timeout=30000, wait_until="domcontentloaded")
-                    if response.status_code != 200:
-                        errors.append(f"HTTP {response.status_code}")
-                        if response.status_code in (401, 403, 429):
+                    if response.status != 200:
+                        errors.append(f"HTTP {response.status}")
+                        if response.status in (401, 403, 429):
                             blocked += 1
                         continue
                     await page.wait_for_timeout(2500)
@@ -144,9 +144,9 @@ class AmazonScraper:
                 try:
                     url = f"https://www.amazon.com.br/s?k={q.replace(' ', '+')}"
                     response = await page.goto(url, timeout=30000, wait_until="domcontentloaded")
-                    if response.status_code != 200:
-                        errors.append(f"HTTP {response.status_code}")
-                        if response.status_code in (401, 403, 429):
+                    if response.status != 200:
+                        errors.append(f"HTTP {response.status}")
+                        if response.status in (401, 403, 429):
                             blocked += 1
                         continue
                     await page.wait_for_timeout(2500)

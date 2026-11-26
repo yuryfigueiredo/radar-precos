@@ -1,4 +1,5 @@
 import unittest
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 from scrapers.amazon import AmazonScraper
@@ -27,7 +28,7 @@ class FakePage:
     async def goto(self, url, **kwargs):
         if self.blocked:
             self.url = "https://account.mercadolivre.com/account-verification"
-        return Mock(status_code=self.status_code)
+        return SimpleNamespace(status=self.status_code)
 
 
 def playwright_manager(page):
@@ -170,6 +171,23 @@ class ScraperHealthTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(scraper.health["SSD"]["status"], "blocked")
         self.assertEqual(scraper.health["SSD"]["attempted"], 5)
         self.assertIn("account-verification", scraper.health["SSD"]["detail"])
+
+    async def test_mercadolivre_http_failure_is_reported(self):
+        for method_name, category, attempted in (
+            ("get_ssds", "SSD", 5),
+            ("get_ram_16gb_ddr4", "RAM", 2),
+        ):
+            with self.subTest(category=category):
+                scraper = MercadoLivreScraper()
+                manager = playwright_manager(FakePage(status_code=503))
+
+                with patch("scrapers.mercadolivre.async_playwright", return_value=manager):
+                    items = await getattr(scraper, method_name)()
+
+                self.assertEqual(items, [])
+                self.assertEqual(scraper.health[category]["status"], "error")
+                self.assertEqual(scraper.health[category]["attempted"], attempted)
+                self.assertIn("HTTP 503", scraper.health[category]["detail"])
 
     async def test_mercadolivre_missing_search_structure_is_an_error(self):
         scraper = MercadoLivreScraper()

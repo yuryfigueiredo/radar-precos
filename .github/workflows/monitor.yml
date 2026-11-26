@@ -24,6 +24,12 @@ jobs:
       - name: Checkout do Repositório
         uses: actions/checkout@v4
 
+      - name: Preparar ferramentas de cache
+        shell: bash
+        run: |
+          "/c/Program Files/Git/usr/bin/gzip.exe" --version
+          echo 'C:\Program Files\Git\usr\bin' >> "$GITHUB_PATH"
+
       - name: Instalar Dependências
         run: |
           python -m pip install --upgrade pip
