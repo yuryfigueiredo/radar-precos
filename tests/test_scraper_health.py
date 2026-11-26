@@ -2,7 +2,7 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
-from scrapers.amazon import AmazonScraper
+from scrapers.amazon import AmazonScraper, _canonicalize_amazon_link
 from scrapers.kabum import KabumScraper
 from scrapers.mercadolivre import MercadoLivreScraper
 from scrapers.pichau import PichauScraper
@@ -248,6 +248,134 @@ class FakeProductPage(FakePage):
         if selector == self.cards_selector:
             return FakeCards(self.cards)
         return FakeLocator()
+
+
+class AmazonLinkTests(unittest.IsolatedAsyncioTestCase):
+    async def test_amazon_sponsored_links_are_canonicalized_for_all_categories(self):
+        sponsored_href = (
+            "https://www.amazon.com.br/sspa/click?ie=UTF8&"
+            "url=%2FSSD-SATA3-480GB-ADATA-480GT-R%2Fdp%2FB07HB4YSWD%2Fref%3Dsr_1_1_sspa"
+        )
+        cases = (
+            ("get_ssds", "SSD ADATA ASU650 480GB SATA", ".a-price .a-offscreen", "R$ 465,40"),
+            (
+                "get_ram_16gb_ddr4",
+                "Memória Gamer 16GB DDR4",
+                ".a-price .a-offscreen",
+                "R$ 699,99",
+            ),
+            (
+                "get_rtx_3060_12gb",
+                "Placa de Vídeo RTX 3060 12GB GDDR6",
+                '.a-price[data-a-strike="false"] .a-offscreen, .a-price:not([data-a-strike="true"]) .a-offscreen',
+                "R$ 2.199,99",
+            ),
+        )
+
+        for method_name, title, price_selector, price in cases:
+            with self.subTest(method=method_name):
+                card = FakeProductCard({
+                    "h2 span, h2": FakeElement(text=title),
+                    "a:has(h2), a[href*=\"/dp/\"], h2 a": FakeElement(href=sponsored_href),
+                    price_selector: FakeElement(text=price),
+                })
+                page = FakeProductPage(
+                    'div[data-component-type="s-search-result"]',
+                    [card],
+                )
+                scraper = AmazonScraper()
+                manager = playwright_manager(page)
+
+                with patch("scrapers.amazon.async_playwright", return_value=manager):
+                    items = await getattr(scraper, method_name)()
+
+                self.assertEqual(len(items), 1)
+                self.assertEqual(
+                    items[0]["link"],
+                    "https://www.amazon.com.br/dp/B07HB4YSWD",
+                )
+
+    async def test_amazon_regular_product_link_drops_tracking(self):
+        card = FakeProductCard({
+            "h2 span, h2": FakeElement(text="SSD ADATA ASU650 480GB SATA"),
+            "a:has(h2), a[href*=\"/dp/\"], h2 a": FakeElement(
+                href="/SSD-SATA3-480GB-ADATA-480GT-R/dp/B07HB4YSWD?ref=sr_1_1"
+            ),
+            ".a-price .a-offscreen": FakeElement(text="R$ 465,40"),
+        })
+        page = FakeProductPage(
+            'div[data-component-type="s-search-result"]',
+            [card],
+        )
+        scraper = AmazonScraper()
+        manager = playwright_manager(page)
+
+        with patch("scrapers.amazon.async_playwright", return_value=manager):
+            items = await scraper.get_ssds()
+
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0]["link"], "https://www.amazon.com.br/dp/B07HB4YSWD")
+
+    async def test_amazon_sponsored_link_without_product_url_is_skipped(self):
+        card = FakeProductCard({
+            "h2 span, h2": FakeElement(text="SSD ADATA ASU650 480GB SATA"),
+            "a:has(h2), a[href*=\"/dp/\"], h2 a": FakeElement(
+                href="https://www.amazon.com.br/sspa/click?ie=UTF8"
+            ),
+            ".a-price .a-offscreen": FakeElement(text="R$ 465,40"),
+        })
+        page = FakeProductPage(
+            'div[data-component-type="s-search-result"]',
+            [card],
+        )
+        scraper = AmazonScraper()
+        manager = playwright_manager(page)
+
+        with patch("scrapers.amazon.async_playwright", return_value=manager):
+            items = await scraper.get_ssds()
+
+        self.assertEqual(items, [])
+
+    def test_amazon_invalid_product_links_are_rejected(self):
+        links = (
+            "https://example.com/dp/B0VALID123",
+            "https://www.amazon.com.br/sspa/click?url=https%3A%2F%2Fexample.com%2Fdp%2FB0VALID123",
+            "https://www.amazon.com.br/sspa/click?url=%2Fdp%2FB0INVALID",
+            "https://www.amazon.com.br/oferta",
+            "https://[invalid/dp/B0VALID123",
+        )
+
+        for href in links:
+            with self.subTest(href=href):
+                self.assertIsNone(_canonicalize_amazon_link(href))
+
+    async def test_amazon_malformed_link_does_not_abort_search(self):
+        malformed_card = FakeProductCard({
+            "h2 span, h2": FakeElement(text="SSD ADATA ASU650 480GB SATA"),
+            "a:has(h2), a[href*=\"/dp/\"], h2 a": FakeElement(
+                href="https://[invalid/dp/B0VALID123"
+            ),
+            ".a-price .a-offscreen": FakeElement(text="R$ 465,40"),
+        })
+        valid_card = FakeProductCard({
+            "h2 span, h2": FakeElement(text="SSD Kingston NV3 480GB SATA"),
+            "a:has(h2), a[href*=\"/dp/\"], h2 a": FakeElement(
+                href="/dp/B07HB4YSWD"
+            ),
+            ".a-price .a-offscreen": FakeElement(text="R$ 469,90"),
+        })
+        page = FakeProductPage(
+            'div[data-component-type="s-search-result"]',
+            [malformed_card, valid_card],
+        )
+        scraper = AmazonScraper()
+        manager = playwright_manager(page)
+
+        with patch("scrapers.amazon.async_playwright", return_value=manager):
+            items = await scraper.get_ssds()
+
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0]["link"], "https://www.amazon.com.br/dp/B07HB4YSWD")
 
 
 class Rtx3060ScraperTests(unittest.IsolatedAsyncioTestCase):
@@ -536,9 +664,9 @@ class Rtx3060ScraperTests(unittest.IsolatedAsyncioTestCase):
         page = FakeProductPage(
             "div[data-component-type=\"s-search-result\"]",
             [
-                card("Placa de Vídeo NVIDIA GeForce RTX 3060 12GB GDDR6", "/dp/B0VALID", "R$ 2.199,99"),
-                card("Placa de Vídeo RTX 3060 8GB GDDR6", "/dp/B0INVALID", "R$ 1.499,99"),
-                card("PC Gamer RTX 3060 12GB 16GB DDR4", "/dp/B0PC", "R$ 2.999,99"),
+                card("Placa de Vídeo NVIDIA GeForce RTX 3060 12GB GDDR6", "/dp/B0VALID123", "R$ 2.199,99"),
+                card("Placa de Vídeo RTX 3060 8GB GDDR6", "/dp/B0INVALID1", "R$ 1.499,99"),
+                card("PC Gamer RTX 3060 12GB 16GB DDR4", "/dp/B0PC123456", "R$ 2.999,99"),
             ],
         )
         scraper = AmazonScraper()
@@ -555,7 +683,7 @@ class Rtx3060ScraperTests(unittest.IsolatedAsyncioTestCase):
     async def test_amazon_rtx_3060_12gb_ignores_struck_through_price(self):
         card = FakeProductCard({
             "h2 span, h2": FakeElement(text="Placa de Vídeo RTX 3060 12GB GDDR6"),
-            "a:has(h2), a[href*=\"/dp/\"], h2 a": FakeElement(href="/dp/B0OLD"),
+            "a:has(h2), a[href*=\"/dp/\"], h2 a": FakeElement(href="/dp/B0OLD12345"),
             ".a-price .a-offscreen": FakeElement(text="R$ 2.499,99"),
         })
         page = FakeProductPage(

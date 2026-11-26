@@ -1,10 +1,48 @@
 import logging
 import re
 from typing import List, Dict, Any
+from urllib.parse import parse_qs, unquote, urlparse
 from playwright.async_api import async_playwright
 from .utils import clean_price, classify_search_page, classify_ssd_capacity, is_rtx_3060_12gb, is_valid_ram_16gb_ddr4, summarize_collection
 
 logger = logging.getLogger(__name__)
+
+
+def _canonicalize_amazon_link(href: str) -> str | None:
+    try:
+        if href.startswith("//"):
+            href = f"https:{href}"
+        parsed = urlparse(href)
+        if not parsed.scheme:
+            parsed = urlparse(f"https://www.amazon.com.br/{href.lstrip('/')}")
+        if parsed.hostname not in {"amazon.com.br", "www.amazon.com.br"}:
+            return None
+
+        target = parsed
+        if parsed.path == "/sspa/click" or parsed.path.startswith("/sspa/click/"):
+            targets = parse_qs(parsed.query).get("url")
+            if not targets:
+                return None
+            target_href = unquote(targets[0])
+            if target_href.startswith("//"):
+                target_href = f"https:{target_href}"
+            target = urlparse(target_href)
+            if not target.scheme:
+                target = urlparse(f"https://www.amazon.com.br/{target_href.lstrip('/')}")
+            if target.hostname not in {"amazon.com.br", "www.amazon.com.br"}:
+                return None
+
+        match = re.search(
+            r"/(?:dp|gp/product)/([A-Z0-9]{10})(?:[/?]|$)",
+            target.path,
+            re.IGNORECASE,
+        )
+        if not match:
+            return None
+        return f"https://www.amazon.com.br/dp/{match.group(1).upper()}"
+    except ValueError:
+        return None
+
 
 async def _classify_search_response(page: Any, query: str, result_count: int) -> tuple[str | None, str | None]:
     status, detail = classify_search_page(await page.content(), result_count)
@@ -73,9 +111,9 @@ class AmazonScraper:
                         href = await link_el.first.get_attribute('href')
                         if not href:
                             continue
-                        if not href.startswith('http'):
-                            href = f"https://www.amazon.com.br{href}"
-                        href = href.split('/ref=')[0] if '/ref=' in href else href
+                        href = _canonicalize_amazon_link(href)
+                        if not href:
+                            continue
                         
                         if href in seen_links:
                             continue
@@ -162,9 +200,9 @@ class AmazonScraper:
                         href = await link_el.first.get_attribute('href')
                         if not href:
                             continue
-                        if not href.startswith('http'):
-                            href = f"https://www.amazon.com.br{href}"
-                        href = href.split('/ref=')[0] if '/ref=' in href else href
+                        href = _canonicalize_amazon_link(href)
+                        if not href:
+                            continue
                         if href in seen_links:
                             continue
                         price_el = card.locator(
@@ -262,9 +300,9 @@ class AmazonScraper:
                         href = await link_el.first.get_attribute('href')
                         if not href:
                             continue
-                        if not href.startswith('http'):
-                            href = f"https://www.amazon.com.br{href}"
-                        href = href.split('/ref=')[0] if '/ref=' in href else href
+                        href = _canonicalize_amazon_link(href)
+                        if not href:
+                            continue
                         
                         if href in seen_links:
                             continue
